@@ -1978,10 +1978,11 @@ let genTupleMultiline (node: ExprTupleNode) =
             | Expr.InfixApp node when (node.Operator.Text = "=") -> genNamedArgumentExpr node
             | _ -> genExpr e
         | Choice2Of2 comma ->
-            if commaLeading then
-                sepNln +> genSingleTextNode comma +> sepSpace
-            else
-                genSingleTextNode comma +> sepNln
+            fun ctx ->
+                if ctx.Config.LeadingTupleSeparator || commaLeading then
+                    (sepNln +> genSingleTextNode comma +> sepSpace) ctx
+                else
+                    (genSingleTextNode comma +> sepNln) ctx
 
     coli sepNone node.Items genItem
 
@@ -2657,7 +2658,12 @@ let genTuplePatLong (node: PatTupleNode) =
 
     col padUntilAtCurrentColumn node.Items (function
         | Choice1Of2 p -> genPat p
-        | Choice2Of2 comma -> genSingleTextNode comma +> sepNln)
+        | Choice2Of2 comma ->
+            fun ctx ->
+                if ctx.Config.LeadingTupleSeparator then
+                    (sepNln +> genSingleTextNode comma +> sepSpace) ctx
+                else
+                    (genSingleTextNode comma +> sepNln) ctx)
 
 let genTuplePat (node: PatTupleNode) =
     let short =
@@ -3375,7 +3381,17 @@ let genSynTupleTypeSegments (path: Choice<Type, SingleTextNode> list) =
         col sepSpace path (fun t ->
             match t with
             | Choice1Of2 t -> genType t
-            | Choice2Of2 node -> genSingleTextNode node +> onlyIf addNewline sepNln)
+            | Choice2Of2 node ->
+                fun ctx ->
+                    if addNewline then
+                        if ctx.Config.LeadingTupleSeparator then
+                            // Extra indentation needed for valid F# syntax in type aliases
+                            let extraSpaces = rep (ctx.Config.IndentSize - 1) (!-" ")
+                            (sepNln +> extraSpaces +> genSingleTextNode node +> sepSpace) ctx
+                        else
+                            (genSingleTextNode node +> sepNln) ctx
+                    else
+                        genSingleTextNode node ctx)
 
     expressionFitsOnRestOfLine (genTs false) (genTs true)
 
