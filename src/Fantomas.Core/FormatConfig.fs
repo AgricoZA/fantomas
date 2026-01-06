@@ -236,7 +236,12 @@ type FormatConfig =
 
       [<Category("Convention")>]
       [<DisplayName("Applies the Stroustrup style to the final (two) array or list argument(s) in a function application")>]
-      ExperimentalElmish: bool }
+      ExperimentalElmish: bool
+
+      [<Category("Convention")>]
+      [<DisplayName("Place tuple separators at the start of line in multiline tuples")>]
+      [<Description("When true, commas in tuple expressions and asterisks in tuple types are placed at the beginning of each line")>]
+      LeadingTupleSeparator: bool }
 
     member x.IsStroustrupStyle = x.MultilineBracketStyle = Stroustrup
 
@@ -276,4 +281,5 @@ type FormatConfig =
           MultilineBracketStyle = Aligned
           KeepMaxNumberOfBlankLines = 100
           NewlineBeforeMultilineComputationExpression = true
-          ExperimentalElmish = false }
+          ExperimentalElmish = false
+          LeadingTupleSeparator = false }
