@@ -3799,7 +3799,13 @@ let genUnionCase (hasVerticalBar: bool) (node: UnionCaseNode) =
     let shortExpr = col sepStar node.Fields genField
 
     let longExpr =
-        indentSepNlnUnindent (atCurrentColumn (col (sepStar +> sepNln) node.Fields genField))
+        let separator ctx =
+            if ctx.Config.LeadingTupleSeparator then
+                (sepNln +> sepStar) ctx
+            else
+                (sepStar +> sepNln) ctx
+
+        indentSepNlnUnindent (atCurrentColumn (col separator node.Fields genField))
 
     let genBar =
         match node.Bar with

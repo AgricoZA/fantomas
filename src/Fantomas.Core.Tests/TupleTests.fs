@@ -687,3 +687,27 @@ type T =
          * string
          * bool
 """
+
+[<Test>]
+let ``leading tuple separator in union case fields`` () =
+    formatSourceString
+        """
+type Animal =
+    | Human of
+        Name: string *
+        Age: int *
+        Address: string
+"""
+        { config with
+            LeadingTupleSeparator = true
+            MaxLineLength = 40 }
+    |> prepend newline
+    |> should
+        equal
+        """
+type Animal =
+    | Human of
+        Name: string
+        * Age: int
+        * Address: string
+"""
