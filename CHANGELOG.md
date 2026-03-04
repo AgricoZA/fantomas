@@ -2,11 +2,15 @@
 
 ## [Unreleased]
 
-## [8.0.0-alpha-003] - 2026-03-03
+## [8.0.0-alpha-003-agrico-001] - 2026-03-04
+
+### Added
+
+- LeadingTupleSeparator now applies to discriminated union case fields
 
 ### Fixed
 
-- End of line comments after infix operators are preserved correctly. [#2287](https://github.com/fsprojects/fantomas/issues/2287)
+- (Upstream 8.0.0-alpha-003) End of line comments after infix operators are preserved correctly. [#2287](https://github.com/fsprojects/fantomas/issues/2287)
 - Lambda closing parenthesis in chained method calls is no longer placed on its own line when `MultiLineLambdaClosingNewline` is enabled. [#2553](https://github.com/fsprojects/fantomas/issues/2553)
 - Long `&` (AND) patterns now break across multiple lines to respect max line length. [#1780](https://github.com/fsprojects/fantomas/issues/1780)
 - Empty array with trivia inside now has correct indentation in Stroustrup style. [#3098](https://github.com/fsprojects/fantomas/issues/3098)
