@@ -136,33 +136,57 @@ Self-formatted using Fantomas 7.0.1.
 
 This is a fork of [fsprojects/fantomas](https://github.com/fsprojects/fantomas) with custom features (e.g., `LeadingTupleSeparator` for union case fields).
 
-### Publishing to Ops Workspace
+### Versioning Scheme
 
-The Ops workspace (`../ops1/Workspace`) consumes Fantomas as a dotnet tool configured in `.config/dotnet-tools.json`.
+Versions follow the pattern `{upstream-version}-agrico-{NNN}`, e.g. `8.0.0-alpha-003-agrico-001`. This embeds the upstream version we're based on and avoids clashes with upstream releases.
+
+### CHANGELOG Constraints
+
+Versions are extracted from `CHANGELOG.md` by `Ionide.KeepAChangelog.Tasks`. Subsection headings must be standard Keep a Changelog types (`Added`, `Changed`, `Fixed`, `Removed`, etc.) — custom headings like `### Upstream` will cause build failures.
+
+### Publishing to GitHub Packages
+
+Packages are published to the **AgricoZA GitHub Packages NuGet feed** (`https://nuget.pkg.github.com/AgricoZA/index.json`), which is configured as a source in `ops1/NuGet.config`. Published versions are visible at https://github.com/orgs/AgricoZA/packages/nuget/package/fantomas.
 
 **Steps to publish a new version:**
 
-1. **Update version in CHANGELOG.md** (e.g., `8.0.0-alpha-003`):
+1. **Update version in CHANGELOG.md**:
    ```markdown
-   ## [8.0.0-alpha-003] - 2026-02-04
+   ## [8.0.0-alpha-003-agrico-002] - 2026-03-05
 
    ### Added
-   - LeadingTupleSeparator now applies to union case fields
+   - Description of new feature
    ```
 
-2. **Build packages:**
+2. **Build and test:**
    ```bash
    dotnet fsi build.fsx
    ```
    Packages are output to `artifacts/package/release/`
 
-3. **In Ops workspace, update the tool:**
+3. **Push to GitHub Packages:**
    ```bash
-   cd ../ops1/Workspace
-   dotnet tool update fantomas --add-source ../fantomas/artifacts/package/release --version 8.0.0-alpha-003
+   dotnet nuget push artifacts/package/release/fantomas.8.0.0-alpha-003-agrico-002.nupkg \
+     --source "https://nuget.pkg.github.com/AgricoZA/index.json" \
+     --api-key $(gh auth token)
    ```
 
-4. **Verify and commit** the updated `.config/dotnet-tools.json` in Ops repo.
+4. **In Ops workspace, update the tool:**
+   ```bash
+   cd ../ops1/Workspace
+   dotnet tool update fantomas --version 8.0.0-alpha-003-agrico-002
+   ```
+
+5. **Verify and commit** the updated `.config/dotnet-tools.json` in Ops repo.
+
+### Syncing Upstream Changes
+
+The `custom` branch is rebased onto `upstream/main` to maintain a clean linear history. Our custom commits sit on top of upstream.
+
+```bash
+git fetch upstream
+git rebase --onto upstream/main <old-upstream-head> custom
+```
 
 ### Custom Features in This Fork
 
