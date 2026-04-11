@@ -22,6 +22,12 @@
 
 - Struct constructor with unparenthesized parameter incorrectly renamed, causing a compile error. [#3349](https://github.com/fsprojects/fantomas/issues/3349)
 
+## [8.0.0-alpha-009-agrico-001] - 2026-04-11
+
+### Added
+
+- LeadingTupleSeparator configuration option for placing tuple separators at the start of line in multiline tuples (expressions, types, patterns, union case fields)
+
 ## [8.0.0-alpha-009] - 2026-04-03
 
 ### Fixed
