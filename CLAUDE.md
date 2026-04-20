@@ -188,6 +188,33 @@ git fetch upstream
 git rebase --onto upstream/main <old-upstream-head> custom
 ```
 
+### Minimising Upstream Merge Conflicts
+
+When adding a fork-specific feature, arrange the code so that rebasing onto `upstream/main` produces at most a few trivial conflicts. The rules below apply to every Agrico feature (`LeadingTupleSeparator`, `RecordFieldAlignment`, anything we add next):
+
+**Tests**
+- New tests go in their own file under `src/Fantomas.Core.Tests/Agrico/` with an `Agrico`-prefixed filename. Upstream never edits these files.
+- Register them at the bottom of the `Fantomas.Core.Tests.fsproj` `<ItemGroup>` under the comment `<!-- Agrico fork: keep custom tests isolated so upstream merges never conflict. -->`. Conflicts on this line are trivial to resolve.
+- Never extend an upstream-owned test file (`TupleTests.fs`, `LetBindingTests.fs`, etc.) with Agrico test cases — move them out.
+
+**Config fields in `FormatConfig.fs`**
+- Append new fields at the end of the `FormatConfig` record and at the end of `FormatConfig.Default`. Both are touchpoints upstream also grows over time; end-of-record placement keeps the textual diff isolated and the merge trivial.
+
+**Behaviour changes in `CodePrinter.fs`**
+- Large helpers (new `gen*` functions, policy predicates, grouping logic) live at the **tail of the file**, after `genField`, clustered together under a section-header comment block that names the feature. Upstream rarely modifies the tail. `module internal rec Fantomas.Core.CodePrinter` means these helpers can be called from anywhere earlier in the file without let-rec acrobatics.
+- The **inline edit** at the upstream call site must collapse to a **single function call** — not a multi-line conditional. Example for `RecordFieldAlignment` in the `TypeDefn.Record` branch:
+  ```fsharp
+  +> indentSepNlnUnindent (genMaybeAlignedFieldList ctx.Config node.Fields)
+  ```
+  Replaces one line of upstream code with one line of our code. If upstream refactors the surrounding function, the merge conflict is a single-line substitution.
+- Add a leading comment at the inline edit (`// Agrico: see <helper-name>.`) so a merger knows exactly what to preserve.
+- The helper should internally fall back to the upstream default when the feature is off, so inserting the call is behaviour-neutral without the config flag.
+
+**Conflict triage when rebasing**
+- The predictable hot spots are: `FormatConfig.fs` (end of record + end of Default), `CodePrinter.fs` (the 1–3 inline call sites per feature), and `Fantomas.Core.Tests.fsproj` (the bottom `<Compile>` block). All other Agrico code lives in files upstream doesn't touch.
+- If upstream refactored around a call site, preserve **the call** (`+> indentSepNlnUnindent (genMaybeAligned...)`), not the surrounding boilerplate — let upstream's boilerplate win, keep our one-line hook.
+
 ### Custom Features in This Fork
 
 - **LeadingTupleSeparator**: Also applies to discriminated union case fields (upstream only supports expressions, types, and patterns)
+- **RecordFieldAlignment**: gofmt-style colon alignment for Stroustrup record type definitions, with blank-line-delimited groups. Long function-type field values wrap at each top-level `->` under the first argument's column; tuple-separator placement reuses the `LeadingTupleSeparator` flag.
