@@ -3585,9 +3585,27 @@ let genTypeDefn (td: TypeDefn) =
         let hasMembers = List.isNotEmpty members
 
         let multilineExpression (ctx: Context) =
+            // Agrico: when RecordFieldAlignment is on and we're in Stroustrup
+            // style, print fields through genFieldAligned with a shared
+            // width-target rather than the standard per-field genField.
+            // Falls back to genField if any field is non-simple (xmlDoc,
+            // attributes, leading keyword, or no name).
+            let useAlignment =
+                ctx.Config.RecordFieldAlignment
+                && ctx.Config.MultilineBracketStyle = Stroustrup
+                && not (List.isEmpty node.Fields)
+                && List.forall isSimpleAlignableField node.Fields
+
+            let genFieldList =
+                if useAlignment then
+                    let widthTarget = node.Fields |> List.map fieldAlignmentWidth |> List.max
+                    col sepNlnUnlessLastEventIsNewline node.Fields (genFieldAligned widthTarget)
+                else
+                    col sepNlnUnlessLastEventIsNewline node.Fields genField
+
             let genRecordFields =
                 genSingleTextNode node.OpeningBrace
-                +> indentSepNlnUnindent (col sepNlnUnlessLastEventIsNewline node.Fields genField)
+                +> indentSepNlnUnindent genFieldList
                 +> sepNlnUnlessLastEventIsNewline
                 +> genSingleTextNode node.ClosingBrace
 
@@ -3808,6 +3826,57 @@ let genField (node: FieldNode) =
     +> optSingle (fun mk -> genSingleTextNode mk +> onlyIfNot mk.HasContentAfter sepSpace) node.MutableKeyword
     +> ifElseCtx hasWriteBeforeNewlineContent (indentSepNlnUnindent genAccessAndFieldContent) genAccessAndFieldContent
     |> genNode node
+
+// Agrico: width of a field's name + `mutable`/access prefixes. Used to
+// compute the per-group padding column when `RecordFieldAlignment` is on.
+let private fieldAlignmentWidth (node: FieldNode) : int =
+    let mutableWidth =
+        match node.MutableKeyword with
+        | Some mk -> mk.Text.Length + 1
+        | None -> 0
+
+    let accessWidth =
+        match node.Accessibility with
+        | Some a -> a.Text.Length + 1
+        | None -> 0
+
+    let nameWidth =
+        match node.Name with
+        | Some n -> n.Text.Length
+        | None -> 0
+
+    mutableWidth + accessWidth + nameWidth
+
+// Agrico: RecordFieldAlignment only applies to simple fields (no XmlDoc,
+// no attributes, no leading keyword like `val`, a concrete name). More
+// elaborate fields fall back to genField's standard layout.
+let private isSimpleAlignableField (node: FieldNode) : bool =
+    node.Name.IsSome
+    && node.XmlDoc.IsNone
+    && node.Attributes.IsNone
+    && node.LeadingKeyword.IsNone
+
+// Agrico: aligned variant of genField. Pads the name (including mutable /
+// accessibility prefixes) to `widthTarget` characters, then emits ` : `
+// and the type. Forces the space-before-colon layout regardless of
+// `SpaceBeforeColon`, because colon alignment is only meaningful when
+// the space before `:` is uniform.
+let private genFieldAligned (widthTarget: int) (node: FieldNode) =
+    let genNameAndPad =
+        fun (ctx: Context) ->
+            let startCol = ctx.Column
+
+            let genName =
+                optSingle (fun mk -> genSingleTextNode mk +> onlyIfNot mk.HasContentAfter sepSpace) node.MutableKeyword
+                +> genAccessOpt node.Accessibility
+                +> (match node.Name with
+                    | Some name -> genSingleTextNode name
+                    | None -> sepNone)
+
+            let ctxAfterName = genName ctx
+            addFixedSpaces (startCol + widthTarget) ctxAfterName
+
+    genNameAndPad +> !-" : " +> genType node.Type |> genNode node
 
 let genUnionCase (hasVerticalBar: bool) (node: UnionCaseNode) =
     let shortExpr = col sepStar node.Fields genField
