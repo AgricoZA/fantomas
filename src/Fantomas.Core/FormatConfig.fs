@@ -241,7 +241,12 @@ type FormatConfig =
       [<Category("Convention")>]
       [<DisplayName("Place tuple separators at the start of line in multiline tuples")>]
       [<Description("When true, commas in tuple expressions and asterisks in tuple types are placed at the beginning of each line")>]
-      LeadingTupleSeparator: bool }
+      LeadingTupleSeparator: bool
+
+      [<Category("Convention")>]
+      [<DisplayName("Align colons across record fields in Stroustrup-style record type definitions")>]
+      [<Description("When true, colons are aligned within groups of consecutive record fields (groups are separated by blank lines). Function-type field values wrap at each top-level '->' under the first argument's column. Applies only to MultilineBracketStyle = Stroustrup record type definitions.")>]
+      RecordFieldAlignment: bool }
 
     member x.IsStroustrupStyle = x.MultilineBracketStyle = Stroustrup
 
@@ -282,4 +287,5 @@ type FormatConfig =
           KeepMaxNumberOfBlankLines = 100
           NewlineBeforeMultilineComputationExpression = true
           ExperimentalElmish = false
-          LeadingTupleSeparator = false }
+          LeadingTupleSeparator = false
+          RecordFieldAlignment = false }
