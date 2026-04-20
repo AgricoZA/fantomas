@@ -137,6 +137,8 @@
     <Compile Include="AutoPropertiesTests.fs" />
     <Compile Include="PrefixTests.fs" />
     <Compile Include="RequiresMultilineToPreserveSemanticsTests.fs" />
+    <!-- Agrico fork: keep custom tests isolated so upstream merges never conflict. -->
+    <Compile Include="Agrico/AgricoLeadingTupleSeparatorTests.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Fantomas.Core\Fantomas.Core.fsproj" />
