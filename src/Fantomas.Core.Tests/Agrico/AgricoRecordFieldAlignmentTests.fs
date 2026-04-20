@@ -49,7 +49,6 @@ type Foo = {
 """
 
 [<Test>]
-[<Ignore(pending)>]
 let ``blank line resets alignment group`` () =
    formatSourceString
       """
@@ -61,7 +60,9 @@ type Foo = {
     X : int
 }
 """
-      config
+      { config with
+         RecordFieldAlignment = true
+         MultilineBracketStyle = Stroustrup }
    |> prepend newline
    |> should
          equal
@@ -100,11 +101,14 @@ type Foo = {
 """
 
 [<Test>]
-[<Ignore(pending)>]
 let ``function-type field wraps at arrow under first argument`` () =
    // Longest name is "GetByContextWithFallback" (24 chars). With a 4-space
-   // indent and ": ", argCol = 4 + 24 + 3 = 31. The wrapped continuation
-   // line starts at argCol with "-> ", so the '-' sits under 'K' of "Key".
+   // indent and ": ", argCol is the column of `Key` on the first line.
+   // Per the "all wrap or none" rule, once the function-type wraps, the
+   // tuple argument also wraps; the continuation `->` is indented one
+   // IndentSize (4) beyond argCol so the result parses as valid F#
+   // (F# requires trailing-`*` tuples' continuation `->` to be strictly
+   // deeper than the tuple items).
    formatSourceString
       """
 type Foo = {
@@ -113,21 +117,26 @@ type Foo = {
     GetSimple                : Key * Context -> Value
 }
 """
-      { config with MaxLineLength = 60 }
+      { config with
+         RecordFieldAlignment = true
+         MultilineBracketStyle = Stroustrup
+         MaxLineLength = 60 }
    |> prepend newline
    |> should
          equal
          """
 type Foo = {
     Get                      : Key -> Value
-    GetByContextWithFallback : Key * Context * Fallback * ExtraArg
-                               -> Value
+    GetByContextWithFallback : Key *
+                               Context *
+                               Fallback *
+                               ExtraArg
+                                   -> Value
     GetSimple                : Key * Context -> Value
 }
 """
 
 [<Test>]
-[<Ignore(pending)>]
 let ``function-type with nested tuple wraps recursively with leading separator`` () =
    // Recursive wrap rule: each operator (`->` or `*`) is placed at the
    // column of its own level's first item. Outer operators sit at argCol
@@ -143,6 +152,8 @@ type Foo = {
 }
 """
       { config with
+         RecordFieldAlignment = true
+         MultilineBracketStyle = Stroustrup
          MaxLineLength = 30
          LeadingTupleSeparator = true }
    |> prepend newline
@@ -160,21 +171,24 @@ type Foo = {
 """
 
 [<Test>]
-[<Ignore(pending)>]
 let ``function-type with nested tuple wraps recursively with trailing separator (default)`` () =
    // Same recursive "all-or-none" wrap with `LeadingTupleSeparator = false`:
    // `*` trails each item except the last, and the first item of each
    // tuple stays on the line of the operator that introduces it
    // (`: FirstType *` and `-> ThirdType *`). Continuation items align
-   // under their tuple's first item (col 8 outer, col 11 nested); arrows
-   // stay at argCol.
+   // under their tuple's first item (col 8 outer, col 11 nested). Each
+   // level's `->` is indented by IndentSize (4) from that level's
+   // argCol, as required for F# to parse trailing-`*` layouts.
    formatSourceString
       """
 type Foo = {
     X : FirstType * SecondType -> MidType -> ThirdType * FourthType -> FinalType
 }
 """
-      { config with MaxLineLength = 30 }
+      { config with
+         RecordFieldAlignment = true
+         MultilineBracketStyle = Stroustrup
+         MaxLineLength = 30 }
    |> prepend newline
    |> should
          equal
@@ -182,18 +196,21 @@ type Foo = {
 type Foo = {
     X : FirstType *
         SecondType
-        -> MidType
-        -> ThirdType *
-           FourthType
-        -> FinalType
+            -> MidType
+            -> ThirdType *
+               FourthType
+            -> FinalType
 }
 """
 
 [<Test>]
-[<Ignore(pending)>]
 let ``wrapped field does not widen alignment column for other fields`` () =
    // Continuation lines do not participate in width calculation; only the
-   // name-to-colon column matters when computing alignment.
+   // name-to-colon column matters when computing alignment. Arrow
+   // continuation lines sit one IndentSize (4) beyond argCol under the
+   // default (trailing) separator rule — required for F# to accept the
+   // layout when a wrapped tuple is involved, and applied uniformly for
+   // consistency even when it isn't.
    formatSourceString
       """
 type Foo = {
@@ -202,7 +219,10 @@ type Foo = {
     B : string
 }
 """
-      { config with MaxLineLength = 50 }
+      { config with
+         RecordFieldAlignment = true
+         MultilineBracketStyle = Stroustrup
+         MaxLineLength = 50 }
    |> prepend newline
    |> should
          equal
@@ -210,8 +230,8 @@ type Foo = {
 type Foo = {
     A         : int
     LongField : SomeLongType
-                -> AnotherLongType
-                -> YetAnotherType
+                    -> AnotherLongType
+                    -> YetAnotherType
     B         : string
 }
 """
@@ -238,19 +258,22 @@ type Foo = {
 """
 
 [<Test>]
-[<Ignore(pending)>]
 let ``long tuple argument wraps at '*' with trailing separator (default)`` () =
    // When the tuple cannot fit on one line, split at every `*`. With the
    // default `LeadingTupleSeparator = false`, the `*` trails the item;
    // continuation items align under the first argument (argCol). The
-   // top-level `->` follows the same argCol rule on its own line.
+   // top-level `->` then sits at argCol + IndentSize, as required for F#
+   // to parse the trailing-`*` layout.
    formatSourceString
       """
 type Foo = {
     Handler : FirstLongInput * SecondLongInput * ThirdLongInput -> ResultValue
 }
 """
-      { config with MaxLineLength = 50 }
+      { config with
+         RecordFieldAlignment = true
+         MultilineBracketStyle = Stroustrup
+         MaxLineLength = 50 }
    |> prepend newline
    |> should
          equal
@@ -259,12 +282,11 @@ type Foo = {
     Handler : FirstLongInput *
               SecondLongInput *
               ThirdLongInput
-              -> ResultValue
+                  -> ResultValue
 }
 """
 
 [<Test>]
-[<Ignore(pending)>]
 let ``long tuple argument wraps at '*' with leading separator`` () =
    // Tuple-wrap uses the same `LeadingTupleSeparator` flag that governs
    // tuple expressions, patterns and union case fields. With it enabled,
@@ -277,6 +299,8 @@ type Foo = {
 }
 """
       { config with
+         RecordFieldAlignment = true
+         MultilineBracketStyle = Stroustrup
          MaxLineLength = 50
          LeadingTupleSeparator = true }
    |> prepend newline
