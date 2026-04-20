@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.0.0-alpha-012-agrico-002] - 2026-04-20
+
+### Added
+
+- `RecordFieldAlignment` configuration option for Stroustrup-style record type definitions. Applies the same column-alignment rules Go's `gofmt` uses for struct fields: within a group of consecutive fields (groups are separated by blank lines) the colons align under a shared column derived from the widest (`mutable`/access prefix + name). Long function-type field values wrap at each top-level `->` at the column of the first argument; tuple arguments wrap at `*` with separator placement following the existing `LeadingTupleSeparator` flag.
+
 ## [8.0.0-alpha-012] - 2026-04-16
 
 ### Changed
