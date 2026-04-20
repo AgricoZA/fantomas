@@ -3585,30 +3585,10 @@ let genTypeDefn (td: TypeDefn) =
         let hasMembers = List.isNotEmpty members
 
         let multilineExpression (ctx: Context) =
-            // Agrico: when RecordFieldAlignment is on and we're in Stroustrup
-            // style, print fields through genFieldAligned with a shared
-            // width-target rather than the standard per-field genField.
-            // Falls back to genField if any field is non-simple (xmlDoc,
-            // attributes, leading keyword, or no name).
-            let useAlignment =
-                ctx.Config.RecordFieldAlignment
-                && ctx.Config.MultilineBracketStyle = Stroustrup
-                && not (List.isEmpty node.Fields)
-                && List.forall isSimpleAlignableField node.Fields
-
-            let genFieldList =
-                if useAlignment then
-                    let groups = groupFieldsByBlankLines node.Fields
-
-                    col sepNlnUnlessLastEventIsNewline groups (fun group ->
-                        let widthTarget = group |> List.map fieldAlignmentWidth |> List.max
-                        col sepNlnUnlessLastEventIsNewline group (genFieldAligned widthTarget))
-                else
-                    col sepNlnUnlessLastEventIsNewline node.Fields genField
-
             let genRecordFields =
                 genSingleTextNode node.OpeningBrace
-                +> indentSepNlnUnindent genFieldList
+                // Agrico: see genMaybeAlignedFieldList.
+                +> indentSepNlnUnindent (genMaybeAlignedFieldList ctx.Config node.Fields)
                 +> sepNlnUnlessLastEventIsNewline
                 +> genSingleTextNode node.ClosingBrace
 
@@ -3830,8 +3810,20 @@ let genField (node: FieldNode) =
     +> ifElseCtx hasWriteBeforeNewlineContent (indentSepNlnUnindent genAccessAndFieldContent) genAccessAndFieldContent
     |> genNode node
 
-// Agrico: width of a field's name + `mutable`/access prefixes. Used to
-// compute the per-group padding column when `RecordFieldAlignment` is on.
+// ============================================================================
+// Agrico fork: RecordFieldAlignment helpers.
+//
+// All helpers below are additive — they don't modify any upstream function,
+// so merges with upstream rarely touch this block. The *only* inline edit
+// in upstream territory is one line inside the `TypeDefn.Record` branch of
+// `genTypeDefn`, where `genMaybeAlignedFieldList` replaces the standard
+// `col sepNlnUnlessLastEventIsNewline node.Fields genField`. When resolving
+// a merge conflict there, preserve that single call and re-apply upstream's
+// changes around it.
+// ============================================================================
+
+// Width of a field's name + `mutable`/access prefixes. Used to compute the
+// per-group padding column when `RecordFieldAlignment` is on.
 let private fieldAlignmentWidth (node: FieldNode) : int =
     let mutableWidth =
         match node.MutableKeyword with
@@ -3982,6 +3974,26 @@ let private genFieldAligned (widthTarget: int) (node: FieldNode) =
         fun (ctx: Context) -> genTypeAtArgCol ctx.Column node.Type ctx
 
     genNameAndPad +> !-" : " +> genTypeWithWrap |> genNode node
+
+// Agrico: single dispatch point used by `genTypeDefn` — returns either the
+// aligned field-list printer or the upstream default. Keeping the full
+// decision (config check + grouping + width computation + fallback) here
+// means the inline edit in upstream territory collapses to one call.
+let private genMaybeAlignedFieldList (cfg: FormatConfig) (fields: FieldNode list) : Context -> Context =
+    let canAlign =
+        cfg.RecordFieldAlignment
+        && cfg.MultilineBracketStyle = Stroustrup
+        && not (List.isEmpty fields)
+        && List.forall isSimpleAlignableField fields
+
+    if canAlign then
+        let groups = groupFieldsByBlankLines fields
+
+        col sepNlnUnlessLastEventIsNewline groups (fun group ->
+            let widthTarget = group |> List.map fieldAlignmentWidth |> List.max
+            col sepNlnUnlessLastEventIsNewline group (genFieldAligned widthTarget))
+    else
+        col sepNlnUnlessLastEventIsNewline fields genField
 
 let genUnionCase (hasVerticalBar: bool) (node: UnionCaseNode) =
     let shortExpr = col sepStar node.Fields genField
