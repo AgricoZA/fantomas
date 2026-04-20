@@ -16,6 +16,7 @@ module Fantomas.Core.Tests.Agrico.AgricoRecordFieldAlignmentTests
 open NUnit.Framework
 open FsUnit
 
+open Fantomas.Core
 open Fantomas.Core.Tests.TestHelpers
 
 // When the feature lands, add `RecordFieldAlignment = true` to each config
@@ -24,7 +25,6 @@ open Fantomas.Core.Tests.TestHelpers
 let private pending = "RecordFieldAlignment feature not yet implemented"
 
 [<Test>]
-[<Ignore(pending)>]
 let ``aligns colons across single-line fields`` () =
    formatSourceString
       """
@@ -34,7 +34,9 @@ type Foo = {
     EmailAddress : string
 }
 """
-      config
+      { config with
+         RecordFieldAlignment = true
+         MultilineBracketStyle = Stroustrup }
    |> prepend newline
    |> should
          equal
@@ -74,15 +76,20 @@ type Foo = {
 """
 
 [<Test>]
-[<Ignore(pending)>]
 let ``single-field group is not padded`` () =
+   // `MaxRecordWidth = 0` forces multi-line layout even for a one-field
+   // record; verifies the alignment path gracefully emits no padding
+   // when there's nothing to align against.
    formatSourceString
       """
 type Foo = {
     OnlyField : string
 }
 """
-      config
+      { config with
+         RecordFieldAlignment = true
+         MultilineBracketStyle = Stroustrup
+         MaxRecordWidth = 0 }
    |> prepend newline
    |> should
          equal
@@ -210,7 +217,6 @@ type Foo = {
 """
 
 [<Test>]
-[<Ignore(pending)>]
 let ``short tuple argument stays on one line`` () =
    // When the tuple fits within MaxLineLength, it is not split.
    formatSourceString
@@ -219,7 +225,9 @@ type Foo = {
     Handler : (Key * Value * Context) -> Result
 }
 """
-      config
+      { config with
+         RecordFieldAlignment = true
+         MultilineBracketStyle = Stroustrup }
    |> prepend newline
    |> should
          equal
