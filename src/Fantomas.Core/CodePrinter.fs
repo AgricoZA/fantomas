@@ -3598,8 +3598,11 @@ let genTypeDefn (td: TypeDefn) =
 
             let genFieldList =
                 if useAlignment then
-                    let widthTarget = node.Fields |> List.map fieldAlignmentWidth |> List.max
-                    col sepNlnUnlessLastEventIsNewline node.Fields (genFieldAligned widthTarget)
+                    let groups = groupFieldsByBlankLines node.Fields
+
+                    col sepNlnUnlessLastEventIsNewline groups (fun group ->
+                        let widthTarget = group |> List.map fieldAlignmentWidth |> List.max
+                        col sepNlnUnlessLastEventIsNewline group (genFieldAligned widthTarget))
                 else
                     col sepNlnUnlessLastEventIsNewline node.Fields genField
 
@@ -3856,11 +3859,110 @@ let private isSimpleAlignableField (node: FieldNode) : bool =
     && node.Attributes.IsNone
     && node.LeadingKeyword.IsNone
 
+// Agrico: partition fields into blank-line-delimited groups. A field
+// starts a new group if its ContentBefore contains a Newline trivia
+// (blank lines are attached as Newline trivia during trivia assignment).
+let private groupFieldsByBlankLines (fields: FieldNode list) : FieldNode list list =
+    let hasBlankLineBefore (field: FieldNode) =
+        (field :> Node).HasContentBefore
+        && (field :> Node).ContentBefore
+           |> Seq.exists (fun tn ->
+               match tn.Content with
+               | TriviaContent.Newline -> true
+               | _ -> false)
+
+    let rec loop current acc remaining =
+        match remaining with
+        | [] -> List.rev (List.rev current :: acc)
+        | field :: rest when current <> [] && hasBlankLineBefore field ->
+            loop [ field ] (List.rev current :: acc) rest
+        | field :: rest -> loop (field :: current) acc rest
+
+    loop [] [] fields
+
+// Agrico: emit `t` in fully vertical layout at column `argCol`. Used when
+// the inline form of a record-field type overflows MaxLineLength.
+// Once we commit to wrapping, every top-level `->` at every nesting level
+// wraps too — the "all or none" rule. Tuple-separator placement (`*` at
+// start or end of continuation lines) reuses `ctx.Config.LeadingTupleSeparator`.
+// Non-Funs / non-Tuple types fall through to the standard `genType`.
+let rec private genTypeWrappedAtArgCol (argCol: int) (t: Type) : Context -> Context =
+    match t with
+    | Type.Funs funs ->
+        fun (ctx: Context) ->
+            // With trailing `*` separators (LeadingTupleSeparator = false),
+            // F# requires the continuation `->` to be strictly more indented
+            // than the tuple items. With leading separators, `->` can sit at
+            // the same column as `*` — both are prefix operators on their
+            // continuation lines, so F# parses them uniformly.
+            let arrowCol =
+                if ctx.Config.LeadingTupleSeparator then
+                    argCol
+                else
+                    argCol + ctx.Config.IndentSize
+
+            let nextArgCol = arrowCol + 3
+
+            let emitFirst =
+                match funs.Parameters with
+                | [] -> genTypeWrappedAtArgCol argCol funs.ReturnType
+                | (firstT, _) :: _ -> genTypeWrappedAtArgCol argCol firstT
+
+            let arrowWithNext =
+                funs.Parameters
+                |> List.mapi (fun i (_, arrow) ->
+                    let nextType =
+                        if i + 1 < funs.Parameters.Length then
+                            fst funs.Parameters.[i + 1]
+                        else
+                            funs.ReturnType
+
+                    arrow, nextType)
+
+            let emitRest =
+                col sepNone arrowWithNext (fun (arrow, nextType) ->
+                    sepNln
+                    +> addFixedSpaces arrowCol
+                    +> genSingleTextNode arrow
+                    +> sepSpace
+                    +> genTypeWrappedAtArgCol nextArgCol nextType)
+
+            (emitFirst +> emitRest) ctx
+
+    | Type.Tuple tuple ->
+        fun (ctx: Context) ->
+            let itemCol = ctx.Column
+            let leading = ctx.Config.LeadingTupleSeparator
+
+            let emit =
+                tuple.Path
+                |> List.mapi (fun idx choice ->
+                    match choice with
+                    | Choice1Of2 inner ->
+                        if idx = 0 then genTypeWrappedAtArgCol itemCol inner
+                        elif leading then genTypeWrappedAtArgCol (itemCol + 2) inner
+                        else genTypeWrappedAtArgCol itemCol inner
+                    | Choice2Of2 sep ->
+                        if leading then
+                            sepNln +> addFixedSpaces itemCol +> genSingleTextNode sep +> sepSpace
+                        else
+                            sepSpace +> genSingleTextNode sep +> sepNln +> addFixedSpaces itemCol)
+                |> List.fold (+>) sepNone
+
+            emit ctx
+
+    | _ -> genType t
+
+// Agrico: try inline `genType`; fall back to the vertical wrap at `argCol`.
+let private genTypeAtArgCol (argCol: int) (t: Type) : Context -> Context =
+    expressionFitsOnRestOfLine (genType t) (genTypeWrappedAtArgCol argCol t)
+
 // Agrico: aligned variant of genField. Pads the name (including mutable /
 // accessibility prefixes) to `widthTarget` characters, then emits ` : `
 // and the type. Forces the space-before-colon layout regardless of
 // `SpaceBeforeColon`, because colon alignment is only meaningful when
-// the space before `:` is uniform.
+// the space before `:` is uniform. Long function-type values wrap at each
+// top-level `->` under the column that immediately follows ` : ` (argCol).
 let private genFieldAligned (widthTarget: int) (node: FieldNode) =
     let genNameAndPad =
         fun (ctx: Context) ->
@@ -3876,7 +3978,10 @@ let private genFieldAligned (widthTarget: int) (node: FieldNode) =
             let ctxAfterName = genName ctx
             addFixedSpaces (startCol + widthTarget) ctxAfterName
 
-    genNameAndPad +> !-" : " +> genType node.Type |> genNode node
+    let genTypeWithWrap =
+        fun (ctx: Context) -> genTypeAtArgCol ctx.Column node.Type ctx
+
+    genNameAndPad +> !-" : " +> genTypeWithWrap |> genNode node
 
 let genUnionCase (hasVerticalBar: bool) (node: UnionCaseNode) =
     let shortExpr = col sepStar node.Fields genField
