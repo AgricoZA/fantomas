@@ -3866,8 +3866,7 @@ let private groupFieldsByBlankLines (fields: FieldNode list) : FieldNode list li
     let rec loop current acc remaining =
         match remaining with
         | [] -> List.rev (List.rev current :: acc)
-        | field :: rest when current <> [] && hasBlankLineBefore field ->
-            loop [ field ] (List.rev current :: acc) rest
+        | field :: rest when current <> [] && hasBlankLineBefore field -> loop [ field ] (List.rev current :: acc) rest
         | field :: rest -> loop (field :: current) acc rest
 
     loop [] [] fields
@@ -3970,8 +3969,7 @@ let private genFieldAligned (widthTarget: int) (node: FieldNode) =
             let ctxAfterName = genName ctx
             addFixedSpaces (startCol + widthTarget) ctxAfterName
 
-    let genTypeWithWrap =
-        fun (ctx: Context) -> genTypeAtArgCol ctx.Column node.Type ctx
+    let genTypeWithWrap = fun (ctx: Context) -> genTypeAtArgCol ctx.Column node.Type ctx
 
     genNameAndPad +> !-" : " +> genTypeWithWrap |> genNode node
 
