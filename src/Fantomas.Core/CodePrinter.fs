@@ -508,9 +508,6 @@ let genExpr (e: Expr) =
                 node
 
         let genMultilineInheritRecordExpr =
-            let fieldsExpr genRecordField =
-                genMultilineRecordFieldsExpr genRecordField node
-
             let genInheritInfo =
                 (genSingleTextNode node.InheritConstructor.InheritKeyword
                  +> sepSpaceOrIndentAndNlnIfExpressionExceedsPageWidth (genInheritConstructor node.InheritConstructor)
@@ -519,7 +516,10 @@ let genExpr (e: Expr) =
 
             let genMultilineAlignBrackets =
                 genSingleTextNode node.OpeningBrace
-                +> indentSepNlnUnindent (genInheritInfo +> fieldsExpr genRecordFieldNameAligned)
+                +> indentSepNlnUnindent (
+                    genInheritInfo
+                    +> genMaybeAlignedRecordFieldsExpr genRecordFieldNameAligned node.Fields
+                )
                 +> sepNln
                 +> genSingleTextNode node.ClosingBrace
 
@@ -1780,7 +1780,8 @@ let genMultilineRecord (node: ExprRecordNode) (ctx: Context) =
                openBraceLength)
 
     let genMultilineAlignBrackets =
-        let fieldsExpr = genMultilineRecordFieldsExpr genRecordFieldNameAligned node
+        let fieldsExpr =
+            genMaybeAlignedRecordFieldsExpr genRecordFieldNameAligned node.Fields
 
         match node.CopyInfo with
         | Some ci ->
@@ -3992,6 +3993,101 @@ let private genMaybeAlignedFieldList (cfg: FormatConfig) (fields: FieldNode list
             col sepNlnUnlessLastEventIsNewline group (genFieldAligned widthTarget))
     else
         col sepNlnUnlessLastEventIsNewline fields genField
+
+// ============================================================================
+// Agrico fork: RecordFieldAlignment helpers for record EXPRESSIONS.
+//
+// Companion to the type-declaration alignment block above. Aligns `=` signs
+// in record construction expressions, gated by the same
+// `RecordFieldAlignment` config flag and the same Stroustrup-only guard.
+// ============================================================================
+
+// Width of a record field's name in a record expression. The IdentListNode
+// may contain dots for qualified names (e.g. `Module.Field`), so we sum
+// the text lengths of all content items.
+let private recordFieldNameWidth (node: RecordFieldNode) : int =
+    node.FieldName.Content
+    |> List.sumBy (fun identOrDot ->
+        match identOrDot with
+        | IdentifierOrDot.Ident n -> n.Text.Length
+        | IdentifierOrDot.KnownDot n -> n.Text.Length
+        | IdentifierOrDot.UnknownDot -> 1)
+
+// Record expression fields have no XmlDoc, attributes, or leading keywords,
+// so the eligibility check is simpler than for type-declaration fields.
+let private isSimpleAlignableRecordField (node: RecordFieldNode) : bool = not node.FieldName.IsEmpty
+
+// Partition record expression fields into blank-line-delimited groups.
+// Same algorithm as `groupFieldsByBlankLines` for type declarations.
+let private groupRecordFieldsByBlankLines (fields: RecordFieldNode list) : RecordFieldNode list list =
+    let hasBlankLineBefore (field: RecordFieldNode) =
+        (field :> Node).HasContentBefore
+        && (field :> Node).ContentBefore
+           |> Seq.exists (fun tn ->
+               match tn.Content with
+               | TriviaContent.Newline -> true
+               | _ -> false)
+
+    let rec loop current acc remaining =
+        match remaining with
+        | [] -> List.rev (List.rev current :: acc)
+        | field :: rest when current <> [] && hasBlankLineBefore field -> loop [ field ] (List.rev current :: acc) rest
+        | field :: rest -> loop (field :: current) acc rest
+
+    loop [] [] fields
+
+// Agrico: aligned variant of record-field expression printer. Pads the
+// field name to `widthTarget` characters, then emits ` = expr`.
+// For Stroustrup-style expressions (records, lists), uses the standard
+// overflow handler so nested records get correct Stroustrup layout.
+// For other expressions, anchors the indent at the current column so
+// wrapping stays to the right of `=` (matching type-declaration behaviour).
+let private genRecordFieldNameEqualsAligned (widthTarget: int) (node: RecordFieldNode) =
+    let nameWidth = recordFieldNameWidth node
+    // Pad so that the space-before-equals lands at column startCol + widthTarget.
+    // We write (widthTarget - nameWidth) spaces to reach that column, then " = ".
+    let paddingSpaces = widthTarget - nameWidth
+
+    let genExprAfterEquals =
+        fun (ctx: Context) ->
+            if isStroustrupStyleExpr ctx.Config node.Expr then
+                sepSpaceOrIndentAndNlnIfExpressionExceedsPageWidthUnlessStroustrup genExpr node.Expr ctx
+            else
+                (sepSpace +> atCurrentColumnIndent (genExpr node.Expr)) ctx
+
+    enterNode node
+    +> genIdentListNode node.FieldName
+    +> rep paddingSpaces (!-" ")
+    +> !-" "
+    +> genSingleTextNode node.Equals
+    +> genExprAfterEquals
+    +> leaveNode node
+
+// Agrico: single dispatch point for record expression field alignment.
+// If alignment is enabled, groups fields and pads names; otherwise falls
+// back to the given `fallbackGenField` function.
+let private genMaybeAlignedRecordFieldsExpr
+    (fallbackGenField: RecordFieldNode -> Context -> Context)
+    (fields: RecordFieldNode list)
+    : Context -> Context =
+    fun (ctx: Context) ->
+        let cfg = ctx.Config
+
+        let canAlign =
+            cfg.RecordFieldAlignment
+            && cfg.MultilineBracketStyle = Stroustrup
+            && not (List.isEmpty fields)
+            && List.forall isSimpleAlignableRecordField fields
+
+        if canAlign then
+            let groups = groupRecordFieldsByBlankLines fields
+
+            (col sepNln groups (fun group ->
+                let widthTarget = group |> List.map recordFieldNameWidth |> List.max
+                col sepNln group (genRecordFieldNameEqualsAligned widthTarget)))
+                ctx
+        else
+            (col sepNln fields fallbackGenField) ctx
 
 let genUnionCase (hasVerticalBar: bool) (node: UnionCaseNode) =
     let shortExpr = col sepStar node.Fields genField
