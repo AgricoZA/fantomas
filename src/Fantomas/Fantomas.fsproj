@@ -10,6 +10,10 @@
     <PackAsTool>True</PackAsTool>
     <AssemblyName>fantomas</AssemblyName>
     <IsPackable>true</IsPackable>
+    <!-- Agrico fork: distinct package ID so `dotnet tool update` cannot
+         accidentally pick up upstream `fantomas` versions from nuget.org.
+         ToolCommandName remains `fantomas` so existing call sites work. -->
+    <PackageId>fantomas.agrico</PackageId>
     <RootNamespace>Fantomas</RootNamespace>
     <ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
   </PropertyGroup>

@@ -138,7 +138,13 @@ This is a fork of [fsprojects/fantomas](https://github.com/fsprojects/fantomas) 
 
 ### Versioning Scheme
 
-Versions follow the pattern `{upstream-version}-agrico-{NNN}`, e.g. `8.0.0-alpha-003-agrico-001`. This embeds the upstream version we're based on and avoids clashes with upstream releases.
+Versions follow the pattern `{upstream-version}-agrico-{NNN}`, e.g. `8.0.0-alpha-003-agrico-001`. This embeds the upstream version we're based on.
+
+**Reset `NNN` to `001` each time we rebase onto a new upstream version.** Within a given upstream, `NNN` counts our own iterations.
+
+### Package ID
+
+This fork publishes as `fantomas.agrico` (not `fantomas`). The CLI command remains `fantomas` (via `<ToolCommandName>fantomas</ToolCommandName>`), so existing `dotnet fantomas` invocations keep working. The distinct package ID isolates our version track from upstream — `dotnet tool update fantomas.agrico` only considers Agrico builds from the GitHub Packages feed, never upstream releases on nuget.org. See `src/Fantomas/Fantomas.fsproj` for the `<PackageId>` declaration.
 
 ### CHANGELOG Constraints
 
@@ -166,7 +172,7 @@ Packages are published to the **AgricoZA GitHub Packages NuGet feed** (`https://
 
 3. **Push to GitHub Packages:**
    ```bash
-   dotnet nuget push artifacts/package/release/fantomas.8.0.0-alpha-003-agrico-002.nupkg \
+   dotnet nuget push artifacts/package/release/fantomas.agrico.8.0.0-alpha-012-agrico-003.nupkg \
      --source "https://nuget.pkg.github.com/AgricoZA/index.json" \
      --api-key $(gh auth token)
    ```
@@ -174,7 +180,13 @@ Packages are published to the **AgricoZA GitHub Packages NuGet feed** (`https://
 4. **In Ops workspace, update the tool:**
    ```bash
    cd ../ops1/Workspace
-   dotnet tool update fantomas --version 8.0.0-alpha-003-agrico-002
+   dotnet tool uninstall fantomas   # only needed once, when migrating from the old package ID
+   dotnet tool install fantomas.agrico --version 8.0.0-alpha-012-agrico-003 --local
+   ```
+
+   Subsequent bumps just need:
+   ```bash
+   dotnet tool update fantomas.agrico --version 8.0.0-alpha-012-agrico-004
    ```
 
 5. **Verify and commit** the updated `.config/dotnet-tools.json` in Ops repo.

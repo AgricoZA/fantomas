@@ -257,7 +257,7 @@
         "resolved": "10.1.0",
         "contentHash": "0R+m7DvS2QuDcFOfDGtyGErRrgXOl4/z2tbNLX2RfvlYJjlVcKG+wMIBfZO8vxGtTNwNxffTG4ibFRwd0jkM7w=="
       },
-      "fantomas": {
+      "fantomas.agrico": {
         "type": "Project",
         "dependencies": {
           "Argu": "[6.2.5, )",
