@@ -1,5 +1,15 @@
 # Changelog
 
+## [8.0.0-alpha-012-agrico-003] - 2026-04-22
+
+### Added
+
+- `RecordFieldAlignment` now also aligns `=` signs in record **construction expressions** (assignments), complementing the existing alignment in record **type declarations**. Same Stroustrup-only gate, same blank-line grouping. For non-Stroustrup value expressions that overflow `MaxLineLength`, the expression stays on the `=` line and wraps from there (mirroring how long function-type values wrap from the `:` line in type declarations).
+
+### Changed
+
+- Package ID renamed from `fantomas` to `fantomas.agrico`. The CLI command name remains `fantomas`, so existing `dotnet fantomas` invocations continue to work unchanged. The rename isolates the fork's version track from upstream `fantomas` on nuget.org — `dotnet tool update fantomas.agrico` will only consider Agrico builds from the GitHub Packages feed, never upstream releases.
+
 ## [8.0.0-alpha-012-agrico-002] - 2026-04-20
 
 ### Added
