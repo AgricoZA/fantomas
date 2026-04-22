@@ -140,6 +140,7 @@
     <!-- Agrico fork: keep custom tests isolated so upstream merges never conflict. -->
     <Compile Include="Agrico/AgricoLeadingTupleSeparatorTests.fs" />
     <Compile Include="Agrico/AgricoRecordFieldAlignmentTests.fs" />
+    <Compile Include="Agrico/AgricoRecordExpressionAlignmentTests.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Fantomas.Core\Fantomas.Core.fsproj" />
