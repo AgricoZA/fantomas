@@ -229,4 +229,6 @@ When adding a fork-specific feature, arrange the code so that rebasing onto `ups
 ### Custom Features in This Fork
 
 - **LeadingTupleSeparator**: Also applies to discriminated union case fields (upstream only supports expressions, types, and patterns)
-- **RecordFieldAlignment**: gofmt-style colon alignment for Stroustrup record type definitions, with blank-line-delimited groups. Long function-type field values wrap at each top-level `->` under the first argument's column; tuple-separator placement reuses the `LeadingTupleSeparator` flag.
+- **RecordFieldAlignment**: gofmt-style alignment for Stroustrup records, with blank-line-delimited groups. Applies to two cases, both gated by the same flag:
+  - **Type declarations**: aligns `:` across record fields. Long function-type field values wrap at each top-level `->` under the first argument's column; tuple-separator placement reuses the `LeadingTupleSeparator` flag.
+  - **Construction expressions**: aligns `=` across record assignments. Stroustrup-style value expressions (nested records, lists) keep their normal layout; other long values (e.g. function applications) stay on the `=` line and wrap from there, mirroring the type-declaration wrap-from-colon behaviour.
