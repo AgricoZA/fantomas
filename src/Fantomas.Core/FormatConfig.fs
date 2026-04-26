@@ -246,7 +246,17 @@ type FormatConfig =
       [<Category("Convention")>]
       [<DisplayName("Align colons across record fields in Stroustrup-style record type definitions")>]
       [<Description("When true, colons are aligned within groups of consecutive record fields (groups are separated by blank lines). Function-type field values wrap at each top-level '->' under the first argument's column. Applies only to MultilineBracketStyle = Stroustrup record type definitions.")>]
-      RecordFieldAlignment: bool }
+      RecordFieldAlignment: bool
+
+      [<Category("Convention")>]
+      [<DisplayName("Align 'of' across discriminated union case declarations")>]
+      [<Description("When true, the 'of' keyword is aligned within groups of consecutive cases of a discriminated union type declaration (groups are separated by blank lines). Cases without 'of' (no payload) do not influence the alignment column. For multi-field cases that wrap, only the column of 'of' on the case line is adjusted; tuple separator placement on continuation lines is governed by LeadingTupleSeparator.")>]
+      UnionCaseAlignment: bool
+
+      [<Category("Convention")>]
+      [<DisplayName("Align '->' across match arms")>]
+      [<Description("When true, the '->' arrow is aligned within groups of consecutive match (or function-keyword) arms whose body fits on the same line as the arrow. Arms whose body wraps to a continuation line keep their arrow at the natural position and do not influence the alignment column. Blank lines reset the alignment group.")>]
+      MatchArrowAlignment: bool }
 
     member x.IsStroustrupStyle = x.MultilineBracketStyle = Stroustrup
 
@@ -288,4 +298,6 @@ type FormatConfig =
           NewlineBeforeMultilineComputationExpression = true
           ExperimentalElmish = false
           LeadingTupleSeparator = false
-          RecordFieldAlignment = false }
+          RecordFieldAlignment = false
+          UnionCaseAlignment = false
+          MatchArrowAlignment = false }
