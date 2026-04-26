@@ -1,5 +1,12 @@
 # Changelog
 
+## [8.0.0-alpha-012-agrico-005] - 2026-04-26
+
+### Added
+
+- `UnionCaseAlignment` configuration option for discriminated union type declarations. Within a group of consecutive cases (groups are separated by blank lines), the `of` keyword aligns under a shared column derived from the widest case identifier in the group. Cases without `of` (no payload) do not influence the alignment column. For multi-field cases that don't fit on a single line, the first field stays inline on the case-name line and subsequent fields wrap with their leading `*` aligned under the first character of the first field's name; falls back to the upstream `of`-on-its-own-line layout when any field would overflow `MaxLineLength` at that inline column. See AgricoZA/Ops#2322.
+- `MatchArrowAlignment` configuration option for `match` and `function` expressions. Within a group of consecutive arms (groups are separated by blank lines, detected via source-range gaps), the `->` arrow aligns under a shared column derived from the widest pattern (and optional `when` clause) among arms whose body fits on the same line as the arrow. Arms whose body wraps to a continuation line keep their arrow at the natural position and do not influence the alignment column. See AgricoZA/Ops#2322.
+
 ## [8.0.0-alpha-012-agrico-004] - 2026-04-26
 
 ### Changed
