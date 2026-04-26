@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.0.0-alpha-012-agrico-004] - 2026-04-26
+
+### Changed
+
+- Package ID reverted from `fantomas.agrico` back to `fantomas`. The `fantomas.agrico` rename in `agrico-003` broke any tooling that looks Fantomas up by package id (notably JetBrains Rider's *Local dotnet tool* detection), which silently fell back to the bundled Fantomas. Resolution is now handled in consumer repos via NuGet `packageSourceMapping`, locking the `fantomas` id to the AgricoZA GitHub Packages feed regardless of what upstream publishes. The CLI command name remains `fantomas`. See AgricoZA/Ops#2320.
+
 ## [8.0.0-alpha-012-agrico-003] - 2026-04-22
 
 ### Added
