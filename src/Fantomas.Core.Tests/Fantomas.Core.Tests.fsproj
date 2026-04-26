@@ -141,6 +141,8 @@
     <Compile Include="Agrico/AgricoLeadingTupleSeparatorTests.fs" />
     <Compile Include="Agrico/AgricoRecordFieldAlignmentTests.fs" />
     <Compile Include="Agrico/AgricoRecordExpressionAlignmentTests.fs" />
+    <Compile Include="Agrico/AgricoUnionCaseAlignmentTests.fs" />
+    <Compile Include="Agrico/AgricoMatchArrowAlignmentTests.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Fantomas.Core\Fantomas.Core.fsproj" />
