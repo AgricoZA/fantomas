@@ -144,7 +144,11 @@ Versions follow the pattern `{upstream-version}-agrico-{NNN}`, e.g. `8.0.0-alpha
 
 ### Package ID
 
-This fork publishes as `fantomas.agrico` (not `fantomas`). The CLI command remains `fantomas` (via `<ToolCommandName>fantomas</ToolCommandName>`), so existing `dotnet fantomas` invocations keep working. The distinct package ID isolates our version track from upstream — `dotnet tool update fantomas.agrico` only considers Agrico builds from the GitHub Packages feed, never upstream releases on nuget.org. See `src/Fantomas/Fantomas.fsproj` for the `<PackageId>` declaration.
+This fork publishes under the upstream package id `fantomas`. The CLI command name is also `fantomas` (via `<ToolCommandName>fantomas</ToolCommandName>`).
+
+A previous attempt (`agrico-003`) renamed the package id to `fantomas.agrico` to dodge SemVer collision with upstream Fantomas on nuget.org. That broke any tooling that looks Fantomas up by package id — most notably JetBrains Rider's *Settings → Languages & Frameworks → F# → Fantomas → Location → Local dotnet tool* detection, which silently fell back to its bundled Fantomas when the manifest entry was keyed on `fantomas.agrico`. Result: on-save formatting in Rider drifted from `dotnet fantomas` CLI output.
+
+`agrico-004` reverted to package id `fantomas`. The collision with upstream Fantomas is now handled on the **consumer side** via NuGet `packageSourceMapping`: the `fantomas` package id is locked to the AgricoZA GitHub Packages feed (`<package pattern="fantomas" />` mapped to `github-agrico`), so `dotnet tool restore`/`update` never sees upstream's `fantomas` builds on nuget.org. See AgricoZA/Ops#2320 for the consumer-side change.
 
 ### CHANGELOG Constraints
 
@@ -152,13 +156,13 @@ Versions are extracted from `CHANGELOG.md` by `Ionide.KeepAChangelog.Tasks`. Sub
 
 ### Publishing to GitHub Packages
 
-Packages are published to the **AgricoZA GitHub Packages NuGet feed** (`https://nuget.pkg.github.com/AgricoZA/index.json`), which is configured as a source in `ops1/NuGet.config`. Published versions are visible at https://github.com/orgs/AgricoZA/packages/nuget/package/fantomas.
+Packages are published to the **AgricoZA GitHub Packages NuGet feed** (`https://nuget.pkg.github.com/AgricoZA/index.json`), which is configured as a source in the Ops repo's `NuGet.config`. Published versions are visible at https://github.com/orgs/AgricoZA/packages/nuget/package/fantomas.
 
 **Steps to publish a new version:**
 
 1. **Update version in CHANGELOG.md**:
    ```markdown
-   ## [8.0.0-alpha-003-agrico-002] - 2026-03-05
+   ## [8.0.0-alpha-012-agrico-NNN] - YYYY-MM-DD
 
    ### Added
    - Description of new feature
@@ -172,24 +176,20 @@ Packages are published to the **AgricoZA GitHub Packages NuGet feed** (`https://
 
 3. **Push to GitHub Packages:**
    ```bash
-   dotnet nuget push artifacts/package/release/fantomas.agrico.8.0.0-alpha-012-agrico-003.nupkg \
+   dotnet nuget push artifacts/package/release/fantomas.8.0.0-alpha-012-agrico-NNN.nupkg \
      --source "https://nuget.pkg.github.com/AgricoZA/index.json" \
      --api-key $(gh auth token)
    ```
 
 4. **In Ops workspace, update the tool:**
    ```bash
-   cd ../ops1/Workspace
-   dotnet tool uninstall fantomas   # only needed once, when migrating from the old package ID
-   dotnet tool install fantomas.agrico --version 8.0.0-alpha-012-agrico-003 --local
+   cd ../ops4/Workspace
+   dotnet tool update fantomas --version 8.0.0-alpha-012-agrico-NNN
    ```
 
-   Subsequent bumps just need:
-   ```bash
-   dotnet tool update fantomas.agrico --version 8.0.0-alpha-012-agrico-004
-   ```
+   The Ops repo's `NuGet.config` files include a `<packageSourceMapping>` block that locks the `fantomas` package id to the AgricoZA feed, so this resolves to the fork even though both feeds carry packages named `fantomas`.
 
-5. **Verify and commit** the updated `.config/dotnet-tools.json` in Ops repo.
+5. **Verify and commit** the updated `.config/dotnet-tools.json` in the Ops repo.
 
 ### Syncing Upstream Changes
 
