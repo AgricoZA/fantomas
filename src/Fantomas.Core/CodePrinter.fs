@@ -4140,8 +4140,7 @@ let private groupUnionCasesByBlankLines (cases: UnionCaseNode list) : UnionCaseN
 // that have `of`. Cases without `of` are skipped — they don't influence
 // the alignment column. Returns 0 if no case in the group has `of`.
 let private unionCaseGroupWidthTarget (group: UnionCaseNode list) : int =
-    let widths =
-        group |> List.filter unionCaseHasOf |> List.map unionCaseIdentWidth
+    let widths = group |> List.filter unionCaseHasOf |> List.map unionCaseIdentWidth
 
     if List.isEmpty widths then 0 else List.max widths
 
@@ -4187,8 +4186,7 @@ let private genUnionCaseFieldsInlineFirst (fields: FieldNode list) (ctx: Context
         let firstFieldCol = ctx.Column
 
         let renderRest =
-            col sepNone restFields (fun f ->
-                sepNln +> addFixedSpaces firstFieldCol +> !-"* " +> genField f)
+            col sepNone restFields (fun f -> sepNln +> addFixedSpaces firstFieldCol +> !-"* " +> genField f)
 
         (genField firstField +> renderRest) ctx
 
@@ -4310,8 +4308,7 @@ let private clausePrefixWidth (node: MatchClauseNode) (ctx: Context) : int =
         | Some barNode -> genSingleTextNodeWithSpaceSuffix sepSpace barNode
         | None -> sepBar
 
-    let genWhen =
-        optSingle (fun e -> sepSpace +> !-"when " +> genExpr e) node.WhenExpr
+    let genWhen = optSingle (fun e -> sepSpace +> !-"when " +> genExpr e) node.WhenExpr
 
     let prefix = genBar +> genPatInClause node.Pattern +> genWhen
     let dummy = ctx.WithDummy(prefix, keepPageWidth = false)
@@ -4328,17 +4325,12 @@ let private clauseFitsInline (node: MatchClauseNode) (ctx: Context) : bool =
         | Some barNode -> genSingleTextNodeWithSpaceSuffix sepSpace barNode
         | None -> sepBar
 
-    let genWhen =
-        optSingle (fun e -> sepSpace +> !-"when " +> genExpr e) node.WhenExpr
+    let genWhen = optSingle (fun e -> sepSpace +> !-"when " +> genExpr e) node.WhenExpr
 
     let genArrowAndBody =
-        sepSpace
-        +> genSingleTextNode node.Arrow
-        +> sepSpace
-        +> genExpr node.BodyExpr
+        sepSpace +> genSingleTextNode node.Arrow +> sepSpace +> genExpr node.BodyExpr
 
-    let inner =
-        genBar +> genPatInClause node.Pattern +> genWhen +> genArrowAndBody
+    let inner = genBar +> genPatInClause node.Pattern +> genWhen +> genArrowAndBody
 
     let dummy = ctx.WithDummy(inner, keepPageWidth = true)
 
@@ -4354,8 +4346,7 @@ let private genClauseAlignedInline (widthTarget: int) (node: MatchClauseNode) =
         | Some barNode -> genSingleTextNodeWithSpaceSuffix sepSpace barNode
         | None -> sepBar
 
-    let genWhen =
-        optSingle (fun e -> sepSpace +> !-"when " +> genExpr e) node.WhenExpr
+    let genWhen = optSingle (fun e -> sepSpace +> !-"when " +> genExpr e) node.WhenExpr
 
     let genPaddedClause (ctx: Context) =
         let startCol = ctx.Column
@@ -4386,11 +4377,7 @@ let private genMaybeAlignedClauses (cfg: FormatConfig) (clauses: MatchClauseNode
         // recursively re-enter genMaybeAlignedClauses for any nested
         // match — multiplying work exponentially in clause-nesting depth.
         // The dummy run only needs upstream layout for the measurement.
-        if
-            not cfg.MatchArrowAlignment
-            || List.isEmpty clauses
-            || ctx.WriterModel.IsDummy
-        then
+        if not cfg.MatchArrowAlignment || List.isEmpty clauses || ctx.WriterModel.IsDummy then
             let lastIndex = clauses.Length - 1
 
             (coli sepNln clauses (fun idx clause ->

@@ -36,7 +36,8 @@ let f x =
     | LongCaseName -> 3
     | VeryLongCaseName -> 4
 """
-        { config with MatchArrowAlignment = true }
+        { config with
+            MatchArrowAlignment = true }
     |> prepend newline
     |> should
         equal
@@ -57,7 +58,8 @@ let f x =
     match x with
     | A -> 1
 """
-        { config with MatchArrowAlignment = true }
+        { config with
+            MatchArrowAlignment = true }
     |> prepend newline
     |> should
         equal
@@ -79,7 +81,8 @@ let f x =
     | LongCaseName -> 3
     | C -> 4
 """
-        { config with MatchArrowAlignment = true }
+        { config with
+            MatchArrowAlignment = true }
     |> prepend newline
     |> should
         equal
@@ -132,7 +135,8 @@ let f =
     | Bb -> 2
     | LongCaseName -> 3
 """
-        { config with MatchArrowAlignment = true }
+        { config with
+            MatchArrowAlignment = true }
     |> prepend newline
     |> should
         equal
@@ -156,7 +160,8 @@ let f x =
     | LongCaseName s -> 0
     | C -> 0
 """
-        { config with MatchArrowAlignment = true }
+        { config with
+            MatchArrowAlignment = true }
     |> prepend newline
     |> should
         equal
@@ -178,7 +183,8 @@ let f x =
     | Bb -> 2
     | LongCaseName -> 3
 """
-        { config with MatchArrowAlignment = false }
+        { config with
+            MatchArrowAlignment = false }
     |> prepend newline
     |> should
         equal

@@ -34,7 +34,8 @@ type Foo =
     | LongCaseName of bool
     | VeryLongCaseName of obj
 """
-        { config with UnionCaseAlignment = true }
+        { config with
+            UnionCaseAlignment = true }
     |> prepend newline
     |> should
         equal
@@ -80,7 +81,8 @@ type Foo =
     | LongCaseName of bool
     | C of obj
 """
-        { config with UnionCaseAlignment = true }
+        { config with
+            UnionCaseAlignment = true }
     |> prepend newline
     |> should
         equal
@@ -104,7 +106,8 @@ type Foo =
     | A of int
     | Bbb of string
 """
-        { config with UnionCaseAlignment = true }
+        { config with
+            UnionCaseAlignment = true }
     |> prepend newline
     |> should
         equal
@@ -125,7 +128,8 @@ type Foo =
     | LongCaseName
     | VeryLongCaseName
 """
-        { config with UnionCaseAlignment = true }
+        { config with
+            UnionCaseAlignment = true }
     |> prepend newline
     |> should
         equal
@@ -261,7 +265,8 @@ type Foo =
     | LongCaseName of bool
     | VeryLongCaseName of obj
 """
-        { config with UnionCaseAlignment = false }
+        { config with
+            UnionCaseAlignment = false }
     |> prepend newline
     |> should
         equal
