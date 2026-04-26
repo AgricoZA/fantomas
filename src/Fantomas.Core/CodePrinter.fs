@@ -2096,12 +2096,9 @@ let genAppSingleParenArgExpr (addSpace: Context -> Context) (node: ExprAppSingle
 
     expressionFitsOnRestOfLine short long |> genNode node
 
-let genClauses (clauses: MatchClauseNode list) =
-    let lastIndex = clauses.Length - 1
-
-    coli sepNln clauses (fun idx clause ->
-        let isLastItem = lastIndex = idx
-        genClause isLastItem clause)
+let genClauses (clauses: MatchClauseNode list) (ctx: Context) =
+    // Agrico: see genMaybeAlignedClauses.
+    genMaybeAlignedClauses ctx.Config clauses ctx
 
 let genClause (isLastItem: bool) (node: MatchClauseNode) =
     let genBar =
@@ -3573,7 +3570,8 @@ let genTypeDefn (td: TypeDefn) =
             | xs ->
                 indentSepNlnUnindent
                     (opt sepNln node.Accessibility genSingleTextNode
-                     +> col sepNln xs (genUnionCase true))
+                     // Agrico: see genMaybeAlignedUnionCases.
+                     +> genMaybeAlignedUnionCases ctx.Config xs)
                     ctx
 
         header
@@ -4088,6 +4086,354 @@ let private genMaybeAlignedRecordFieldsExpr
                 ctx
         else
             (col sepNln fields fallbackGenField) ctx
+
+// ============================================================================
+// Agrico fork: UnionCaseAlignment helpers.
+//
+// Companion block to the RecordFieldAlignment helpers above, this time for
+// discriminated unions. Aligns the `of` keyword across consecutive cases
+// (group separated by blank lines, cases without `of` skipped from the
+// column computation), gated by `UnionCaseAlignment`. For multi-field
+// cases the inline-first-field layout is preferred when it fits: the
+// first field sits on the case-name line after `of`, and subsequent
+// fields on continuation lines whose leading `*` aligns under the first
+// character of the first field's name. Falls back to the upstream
+// of-on-its-own-line layout when any field would overflow MaxLineLength
+// at the inline column.
+//
+// All helpers are additive. The only inline edit in upstream territory
+// is one line inside the multi-case branch of `TypeDefn.Union` in
+// `genTypeDefn` (`genMaybeAlignedUnionCases ctx.Config xs` replaces
+// `col sepNln xs (genUnionCase true)`).
+// ============================================================================
+
+let private unionCaseHasOf (node: UnionCaseNode) : bool = List.isNotEmpty node.Fields
+
+let private unionCaseIdentWidth (node: UnionCaseNode) : int = node.Identifier.Text.Length
+
+// Cases with XmlDoc or attributes have header content that breaks the
+// simple identifier-padding model; the entire group falls back to
+// upstream's `genUnionCase` layout in that case.
+let private isSimpleAlignableUnionCase (node: UnionCaseNode) : bool =
+    node.XmlDoc.IsNone && node.Attributes.IsNone
+
+// Partition union cases into blank-line-delimited groups. Same algorithm
+// as the record-field grouping helpers above.
+let private groupUnionCasesByBlankLines (cases: UnionCaseNode list) : UnionCaseNode list list =
+    let hasBlankLineBefore (case: UnionCaseNode) =
+        (case :> Node).HasContentBefore
+        && (case :> Node).ContentBefore
+           |> Seq.exists (fun tn ->
+               match tn.Content with
+               | TriviaContent.Newline -> true
+               | _ -> false)
+
+    let rec loop current acc remaining =
+        match remaining with
+        | [] -> List.rev (List.rev current :: acc)
+        | case :: rest when current <> [] && hasBlankLineBefore case -> loop [ case ] (List.rev current :: acc) rest
+        | case :: rest -> loop (case :: current) acc rest
+
+    loop [] [] cases
+
+// Width target for an alignment group: max identifier width across cases
+// that have `of`. Cases without `of` are skipped — they don't influence
+// the alignment column. Returns 0 if no case in the group has `of`.
+let private unionCaseGroupWidthTarget (group: UnionCaseNode list) : int =
+    let widths =
+        group |> List.filter unionCaseHasOf |> List.map unionCaseIdentWidth
+
+    if List.isEmpty widths then 0 else List.max widths
+
+// Width of a field's printed (single-line) form. Uses `WithDummy` to
+// render the field in a side context with MaxLineLength = MaxValue so
+// the natural single-line width is returned regardless of the live
+// page-width constraint. Suitable for fields without xmlDoc/attributes
+// — the simple-alignable predicate guards this.
+let private fieldRenderedWidth (field: FieldNode) (ctx: Context) : int =
+    let dummyResult = ctx.WithDummy(genField field, keepPageWidth = false)
+    dummyResult.Column - ctx.Column
+
+// Predicate: does the inline-first-field layout fit within MaxLineLength?
+// The first field starts at `firstFieldCol` (the current column when this
+// is called); subsequent fields start two columns to the right of `*`,
+// which itself sits at `firstFieldCol`. Each line must fit individually.
+let private inlineFirstFieldFits (fields: FieldNode list) (ctx: Context) : bool =
+    match fields with
+    | [] -> true
+    | [ _ ] -> true
+    | firstField :: restFields ->
+        let maxLine = ctx.Config.MaxLineLength
+        let firstFieldCol = ctx.Column
+        let firstFits = firstFieldCol + fieldRenderedWidth firstField ctx <= maxLine
+        // Continuation lines start with `* ` at firstFieldCol, putting
+        // the field name at firstFieldCol + 2.
+        let contFieldCol = firstFieldCol + 2
+
+        let restFits =
+            restFields
+            |> List.forall (fun f -> contFieldCol + fieldRenderedWidth f ctx <= maxLine)
+
+        firstFits && restFits
+
+// Layout 2 for multi-field cases: render the first field at the current
+// column (where `of ` left off), then each subsequent field on its own
+// line with leading `*` aligned at the first field's start column.
+let private genUnionCaseFieldsInlineFirst (fields: FieldNode list) (ctx: Context) : Context =
+    match fields with
+    | [] -> ctx
+    | [ singleField ] -> genField singleField ctx
+    | firstField :: restFields ->
+        let firstFieldCol = ctx.Column
+
+        let renderRest =
+            col sepNone restFields (fun f ->
+                sepNln +> addFixedSpaces firstFieldCol +> !-"* " +> genField f)
+
+        (genField firstField +> renderRest) ctx
+
+// Layout 3 for multi-field cases: replicates upstream's `longExpr` from
+// `genUnionCase` — `of` ends the case line, all fields wrap below at the
+// indented column with `*` separators (placement governed by
+// `LeadingTupleSeparator`).
+let private genUnionCaseFieldsBelowOf (fields: FieldNode list) =
+    let separator (ctx: Context) =
+        if ctx.Config.LeadingTupleSeparator then
+            (sepNln +> sepStar) ctx
+        else
+            (sepStar +> sepNln) ctx
+
+    indentSepNlnUnindent (atCurrentColumn (col separator fields genField))
+
+// Bar-rendering for the aligned variant. Always treats hasVerticalBar as
+// true since alignment only applies in the multi-case `xs` branch.
+let private genUnionCaseAlignedBar (node: UnionCaseNode) =
+    match node.Bar with
+    | Some bar -> genSingleTextNodeWithSpaceSuffix sepSpace bar
+    | None -> sepBar
+
+// Aligned variant of `genUnionCase`. Pads case identifiers so `of` lines
+// up across the group. For multi-field cases tries Layout 1 (single-line
+// short form), then Layout 2 (inline first field with `*`-aligned wrap),
+// then Layout 3 (of-on-its-own-line with all fields wrapped).
+let private genUnionCaseAligned (widthTarget: int) (node: UnionCaseNode) =
+    let identWidth = unionCaseIdentWidth node
+    // Total spaces before "of " = (widthTarget - identWidth) + 1.
+    // The `+ 1` is the standard single-space separator before `of` that
+    // upstream's `wordOf` provides via `sepSpace`. We write the spaces
+    // explicitly here (rather than via `sepSpace`) because `sepSpace`
+    // skips its space when the previous char is already a space — so
+    // `rep paddingSpaces (!-" ") +> wordOf` ends up one space short for
+    // padded cases.
+    let totalSpacesBeforeOf = max 1 (widthTarget - identWidth + 1)
+
+    // Header writes `bar + identifier + spaces-before-of + "of "` when
+    // the case has fields, or just `bar + identifier` otherwise.
+    let genHeader =
+        sepNlnWhenWriteBeforeNewlineNotEmpty
+        +> genOnelinerAttributes node.Attributes
+        +> genSingleTextNode node.Identifier
+        +> onlyIf (unionCaseHasOf node) (rep totalSpacesBeforeOf (!-" ") +> !-"of ")
+
+    let shortFieldsExpr = col sepStar node.Fields genField
+
+    let multilineDispatcher (ctx: Context) =
+        if inlineFirstFieldFits node.Fields ctx then
+            genUnionCaseFieldsInlineFirst node.Fields ctx
+        else
+            genUnionCaseFieldsBelowOf node.Fields ctx
+
+    genXml node.XmlDoc
+    +> genUnionCaseAlignedBar node
+    +> atCurrentColumn genHeader
+    +> onlyIf (unionCaseHasOf node) (expressionFitsOnRestOfLine shortFieldsExpr multilineDispatcher)
+    |> genNode node
+
+// Single dispatch point for union case alignment. If alignment is enabled
+// and every case in the list is simple-alignable, groups them by blank
+// lines and emits each group with its own width target. Otherwise falls
+// back to upstream's `col sepNln cases (genUnionCase true)`.
+let private genMaybeAlignedUnionCases (cfg: FormatConfig) (cases: UnionCaseNode list) : Context -> Context =
+    let canAlign =
+        cfg.UnionCaseAlignment
+        && not (List.isEmpty cases)
+        && List.forall isSimpleAlignableUnionCase cases
+
+    if canAlign then
+        let groups = groupUnionCasesByBlankLines cases
+
+        col sepNln groups (fun group ->
+            let widthTarget = unionCaseGroupWidthTarget group
+            col sepNln group (genUnionCaseAligned widthTarget))
+    else
+        col sepNln cases (genUnionCase true)
+
+// ============================================================================
+// Agrico fork: MatchArrowAlignment helpers.
+//
+// Aligns `->` across consecutive arms of a `match` or `function`
+// expression, gated by `MatchArrowAlignment`. Arms whose body wraps to a
+// continuation line keep their arrow at the natural position and don't
+// influence the alignment column for sibling arms.
+//
+// The only inline edit in upstream territory is the body of `genClauses`,
+// which becomes a one-line dispatch to `genMaybeAlignedClauses`.
+// ============================================================================
+
+let private groupClausesByBlankLines (clauses: MatchClauseNode list) : MatchClauseNode list list =
+    // For match clauses, blank-line trivia attaches inconsistently — it
+    // can land on the clause node, on the bar token, or on a descendant
+    // of the body of the previous clause. Use the source ranges instead:
+    // if a clause starts more than one line after the previous clause
+    // ends, a blank line separates them in the original source.
+    let startsNewGroup (prev: MatchClauseNode) (curr: MatchClauseNode) =
+        let prevEnd = (prev :> Node).Range.EndLine
+        let currStart = (curr :> Node).Range.StartLine
+        currStart > prevEnd + 1
+
+    let rec loop currentGroup currentPrev acc remaining =
+        match remaining with
+        | [] -> List.rev (List.rev currentGroup :: acc)
+        | clause :: rest ->
+            match currentPrev with
+            | Some prev when startsNewGroup prev clause ->
+                loop [ clause ] (Some clause) (List.rev currentGroup :: acc) rest
+            | _ -> loop (clause :: currentGroup) (Some clause) acc rest
+
+    loop [] None [] clauses
+
+// Render the bar + pattern + (optional when) prefix into a dummy
+// context; return the column delta from start.
+let private clausePrefixWidth (node: MatchClauseNode) (ctx: Context) : int =
+    let genBar =
+        match node.Bar with
+        | Some barNode -> genSingleTextNodeWithSpaceSuffix sepSpace barNode
+        | None -> sepBar
+
+    let genWhen =
+        optSingle (fun e -> sepSpace +> !-"when " +> genExpr e) node.WhenExpr
+
+    let prefix = genBar +> genPatInClause node.Pattern +> genWhen
+    let dummy = ctx.WithDummy(prefix, keepPageWidth = false)
+    dummy.Column - ctx.Column
+
+// Predicate: does the clause's code render on a single line within
+// MaxLineLength at the current ctx position? Bypasses genNode wrapping,
+// so blank-line / comment trivia attached to the clause node doesn't
+// inflate LineCount during the dummy run — we want a pure code-layout
+// check, not a trivia-aware one.
+let private clauseFitsInline (node: MatchClauseNode) (ctx: Context) : bool =
+    let genBar =
+        match node.Bar with
+        | Some barNode -> genSingleTextNodeWithSpaceSuffix sepSpace barNode
+        | None -> sepBar
+
+    let genWhen =
+        optSingle (fun e -> sepSpace +> !-"when " +> genExpr e) node.WhenExpr
+
+    let genArrowAndBody =
+        sepSpace
+        +> genSingleTextNode node.Arrow
+        +> sepSpace
+        +> genExpr node.BodyExpr
+
+    let inner =
+        genBar +> genPatInClause node.Pattern +> genWhen +> genArrowAndBody
+
+    let dummy = ctx.WithDummy(inner, keepPageWidth = true)
+
+    dummy.WriterModel.LineCount = ctx.WriterModel.LineCount
+    && dummy.Column <= ctx.Config.MaxLineLength
+
+// Aligned variant: render bar + pattern + (when?), pad to widthTarget,
+// then `-> body` inline. Used for clauses whose body fits on the same
+// line as the arrow.
+let private genClauseAlignedInline (widthTarget: int) (node: MatchClauseNode) =
+    let genBar =
+        match node.Bar with
+        | Some barNode -> genSingleTextNodeWithSpaceSuffix sepSpace barNode
+        | None -> sepBar
+
+    let genWhen =
+        optSingle (fun e -> sepSpace +> !-"when " +> genExpr e) node.WhenExpr
+
+    let genPaddedClause (ctx: Context) =
+        let startCol = ctx.Column
+        // Pad after the prefix to (startCol + widthTarget + 1). The +1 is
+        // the standard single-space separator before `->` that the
+        // longest clause would naturally have (sepSpace would emit a
+        // space because the previous char is the pattern's last char).
+        // For shorter clauses, addFixedSpaces emits enough spaces to
+        // reach the same column. The arrow then sits at the same column
+        // for every clause in the group.
+        (genBar
+         +> genPatInClause node.Pattern
+         +> genWhen
+         +> addFixedSpaces (startCol + widthTarget + 1)
+         +> genSingleTextNode node.Arrow
+         +> sepSpace
+         +> genExpr node.BodyExpr)
+            ctx
+
+    genPaddedClause |> genNode node
+
+let private genMaybeAlignedClauses (cfg: FormatConfig) (clauses: MatchClauseNode list) : Context -> Context =
+    fun (ctx: Context) ->
+        // Short-circuit when alignment is off, when there's nothing to
+        // align, or when we're inside a dummy measurement run. The dummy
+        // short-circuit is critical: clauseFitsInline performs a dummy
+        // render of an entire clause to decide eligibility, which would
+        // recursively re-enter genMaybeAlignedClauses for any nested
+        // match — multiplying work exponentially in clause-nesting depth.
+        // The dummy run only needs upstream layout for the measurement.
+        if
+            not cfg.MatchArrowAlignment
+            || List.isEmpty clauses
+            || ctx.WriterModel.IsDummy
+        then
+            let lastIndex = clauses.Length - 1
+
+            (coli sepNln clauses (fun idx clause ->
+                let isLastItem = lastIndex = idx
+                genClause isLastItem clause))
+                ctx
+        else
+            let lastIndex = clauses.Length - 1
+            let groups = groupClausesByBlankLines clauses
+
+            // Per-group width target: the largest prefix width among
+            // clauses whose body fits inline at their natural position.
+            // Wrapping clauses keep their natural arrow position and do
+            // not influence the alignment column.
+            let groupWidths =
+                groups
+                |> List.map (fun group ->
+                    let widths =
+                        group
+                        |> List.choose (fun c ->
+                            if clauseFitsInline c ctx then
+                                Some(clausePrefixWidth c ctx)
+                            else
+                                None)
+
+                    if List.isEmpty widths then 0 else List.max widths)
+
+            let mutable runningIdx = 0
+
+            let renderClause (widthTarget: int) (clause: MatchClauseNode) =
+                let isLastItem = runningIdx = lastIndex
+                let fits = clauseFitsInline clause ctx
+                let prefixWidth = clausePrefixWidth clause ctx
+                runningIdx <- runningIdx + 1
+
+                if fits && prefixWidth < widthTarget then
+                    genClauseAlignedInline widthTarget clause
+                else
+                    genClause isLastItem clause
+
+            (col sepNln (List.zip groups groupWidths) (fun (group, widthTarget) ->
+                col sepNln group (fun clause -> renderClause widthTarget clause)))
+                ctx
 
 let genUnionCase (hasVerticalBar: bool) (node: UnionCaseNode) =
     let shortExpr = col sepStar node.Fields genField

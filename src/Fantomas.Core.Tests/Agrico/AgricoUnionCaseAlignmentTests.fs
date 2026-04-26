@@ -48,10 +48,11 @@ type Foo =
 
 [<Test>]
 let ``single-case DU is not padded`` () =
-    // Verifies the alignment path emits no trailing padding when there is
-    // nothing to align against. BarBeforeDiscriminatedUnionDeclaration
-    // forces the multi-line layout (otherwise Fantomas inlines a one-case
-    // DU as `type Foo = OnlyCase of int`).
+    // Verifies that when only one case is present, the alignment code
+    // path emits no trailing padding. MaxLineLength = 25 forces the
+    // multi-line layout (the inline form ` OnlyCase of int` is 16 chars
+    // measured from after `type Foo =` at col 10, which exceeds the
+    // remaining-on-line budget of 15).
     formatSourceString
         """
 type Foo =
@@ -59,7 +60,7 @@ type Foo =
 """
         { config with
             UnionCaseAlignment = true
-            BarBeforeDiscriminatedUnionDeclaration = true }
+            MaxLineLength = 25 }
     |> prepend newline
     |> should
         equal
@@ -138,13 +139,19 @@ type Foo =
 
 [<Test>]
 let ``multi-field case keeps first field on the case-name line when it fits`` () =
-    // When a multi-field DU case fits horizontally with its first field on
-    // the case-name line, that's the preferred layout. The continuation
-    // lines (`*`) align under the first character of the first field's
-    // name (the `N` of `Name` here) so the field columns line up
-    // vertically. UnionCaseAlignment still pads `A` so its `of` lines up
-    // with `Big`'s `of`; that propagates to the column of `Name` (and
-    // therefore the `*`s) being the same as if `A` weren't padded.
+    // When a multi-field DU case can't fit on a single line but its first
+    // field can sit inline with `of`, that's the preferred wrap. The
+    // continuation lines (`*`) align under the first character of the
+    // first field's name (the `N` of `Name` here) so the field columns
+    // line up vertically. UnionCaseAlignment still pads `A` so its `of`
+    // lines up with `Big`'s `of`; that propagates to the column of
+    // `Name` (and therefore the `*`s) being the same as if `A` weren't
+    // padded.
+    //
+    // MaxLineLength = 40 forces the wrap: the all-on-one-line form
+    // `    | Big of Name: string * Age: int * Address: string` is 53
+    // chars and overflows; the inline-first-field form fits with the
+    // longest wrapped line `             * Address: string` at 30 chars.
     formatSourceString
         """
 type Foo =
@@ -157,7 +164,7 @@ type Foo =
         { config with
             UnionCaseAlignment = true
             LeadingTupleSeparator = true
-            MaxLineLength = 80 }
+            MaxLineLength = 40 }
     |> prepend newline
     |> should
         equal
@@ -175,8 +182,12 @@ let ``multi-field case falls back when first field would overflow`` () =
     // `N` of the first field's name), would exceed MaxLineLength, fall
     // back to the layout where `of` ends the case line and all fields
     // wrap below it (col 8 here, under the `N` in the wrapped layout).
-    // Here it's the first field that overflows. UnionCaseAlignment still
-    // aligns `of` on the single-line cases in the group.
+    // Here it's the first field that overflows.
+    //
+    // Inline column would be col 13. At col 13, `VeryLongFieldName: string`
+    // is 38 chars — exceeds MaxLineLength=35. In the fallback (col 8), the
+    // same field is 33 chars and fits. UnionCaseAlignment still aligns
+    // `of` on the single-line cases in the group.
     formatSourceString
         """
 type Foo =
@@ -189,7 +200,7 @@ type Foo =
         { config with
             UnionCaseAlignment = true
             LeadingTupleSeparator = true
-            MaxLineLength = 30 }
+            MaxLineLength = 35 }
     |> prepend newline
     |> should
         equal
