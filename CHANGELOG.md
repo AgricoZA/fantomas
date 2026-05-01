@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.0.0-alpha-012-agrico-008] - 2026-05-01
+
+### Changed
+
+- Rebuilt the #2416 formatter fix from committed source so package metadata points at the implementation commit.
+
 ## [8.0.0-alpha-012-agrico-007] - 2026-05-01
 
 ### Fixed
