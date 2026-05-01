@@ -3850,22 +3850,30 @@ let private isSimpleAlignableField (node: FieldNode) : bool =
     && node.Attributes.IsNone
     && node.LeadingKeyword.IsNone
 
-// Agrico: partition fields into blank-line-delimited groups. A field
-// starts a new group if its ContentBefore contains a Newline trivia
-// (blank lines are attached as Newline trivia during trivia assignment).
-let private groupFieldsByBlankLines (fields: FieldNode list) : FieldNode list list =
-    let hasBlankLineBefore (field: FieldNode) =
-        (field :> Node).HasContentBefore
-        && (field :> Node).ContentBefore
-           |> Seq.exists (fun tn ->
-               match tn.Content with
-               | TriviaContent.Newline -> true
-               | _ -> false)
+// Agrico: leading section comments are visual separators in the same way
+// blank lines are. A comment with leading blank lines is represented as a
+// single trivia case, so checking for Newline alone misses that boundary.
+let private hasAlignmentGroupBoundaryBefore (node: Node) =
+    node.HasContentBefore
+    && node.ContentBefore
+       |> Seq.exists (fun tn ->
+           match tn.Content with
+           | TriviaContent.Newline
+           | TriviaContent.CommentOnSingleLine _
+           | TriviaContent.CommentOnSingleLineWithLeadingNewlines _
+           | TriviaContent.BlockComment _
+           | TriviaContent.Directive _ -> true
+           | TriviaContent.LineCommentAfterSourceCode _
+           | TriviaContent.Cursor -> false)
 
+// Agrico: partition fields into groups delimited by blank lines or leading
+// section comments.
+let private groupFieldsByBlankLines (fields: FieldNode list) : FieldNode list list =
     let rec loop current acc remaining =
         match remaining with
         | [] -> List.rev (List.rev current :: acc)
-        | field :: rest when current <> [] && hasBlankLineBefore field -> loop [ field ] (List.rev current :: acc) rest
+        | field :: rest when current <> [] && hasAlignmentGroupBoundaryBefore (field :> Node) ->
+            loop [ field ] (List.rev current :: acc) rest
         | field :: rest -> loop (field :: current) acc rest
 
     loop [] [] fields
@@ -4015,21 +4023,15 @@ let private recordFieldNameWidth (node: RecordFieldNode) : int =
 // so the eligibility check is simpler than for type-declaration fields.
 let private isSimpleAlignableRecordField (node: RecordFieldNode) : bool = not node.FieldName.IsEmpty
 
-// Partition record expression fields into blank-line-delimited groups.
-// Same algorithm as `groupFieldsByBlankLines` for type declarations.
+// Partition record expression fields into groups delimited by blank lines
+// or leading section comments. Same algorithm as `groupFieldsByBlankLines`
+// for type declarations.
 let private groupRecordFieldsByBlankLines (fields: RecordFieldNode list) : RecordFieldNode list list =
-    let hasBlankLineBefore (field: RecordFieldNode) =
-        (field :> Node).HasContentBefore
-        && (field :> Node).ContentBefore
-           |> Seq.exists (fun tn ->
-               match tn.Content with
-               | TriviaContent.Newline -> true
-               | _ -> false)
-
     let rec loop current acc remaining =
         match remaining with
         | [] -> List.rev (List.rev current :: acc)
-        | field :: rest when current <> [] && hasBlankLineBefore field -> loop [ field ] (List.rev current :: acc) rest
+        | field :: rest when current <> [] && hasAlignmentGroupBoundaryBefore (field :> Node) ->
+            loop [ field ] (List.rev current :: acc) rest
         | field :: rest -> loop (field :: current) acc rest
 
     loop [] [] fields
@@ -4117,21 +4119,14 @@ let private unionCaseIdentWidth (node: UnionCaseNode) : int = node.Identifier.Te
 let private isSimpleAlignableUnionCase (node: UnionCaseNode) : bool =
     node.XmlDoc.IsNone && node.Attributes.IsNone
 
-// Partition union cases into blank-line-delimited groups. Same algorithm
-// as the record-field grouping helpers above.
+// Partition union cases into groups delimited by blank lines or leading
+// section comments. Same algorithm as the record-field grouping helpers above.
 let private groupUnionCasesByBlankLines (cases: UnionCaseNode list) : UnionCaseNode list list =
-    let hasBlankLineBefore (case: UnionCaseNode) =
-        (case :> Node).HasContentBefore
-        && (case :> Node).ContentBefore
-           |> Seq.exists (fun tn ->
-               match tn.Content with
-               | TriviaContent.Newline -> true
-               | _ -> false)
-
     let rec loop current acc remaining =
         match remaining with
         | [] -> List.rev (List.rev current :: acc)
-        | case :: rest when current <> [] && hasBlankLineBefore case -> loop [ case ] (List.rev current :: acc) rest
+        | case :: rest when current <> [] && hasAlignmentGroupBoundaryBefore (case :> Node) ->
+            loop [ case ] (List.rev current :: acc) rest
         | case :: rest -> loop (case :: current) acc rest
 
     loop [] [] cases

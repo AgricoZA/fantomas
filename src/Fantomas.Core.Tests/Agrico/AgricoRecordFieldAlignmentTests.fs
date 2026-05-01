@@ -77,6 +77,70 @@ type Foo = {
 """
 
 [<Test>]
+let ``section comment resets alignment group`` () =
+    formatSourceString
+        """
+type Foo = {
+    Id : int
+    Ok : bool
+    // Header event information
+    SomeVeryLongField : string
+    X : int
+    // Metadata
+    At : DateTimeOffset
+    By : string
+}
+"""
+        { config with
+            RecordFieldAlignment = true
+            MultilineBracketStyle = Stroustrup }
+    |> prepend newline
+    |> should
+        equal
+        """
+type Foo = {
+    Id : int
+    Ok : bool
+    // Header event information
+    SomeVeryLongField : string
+    X                 : int
+    // Metadata
+    At : DateTimeOffset
+    By : string
+}
+"""
+
+[<Test>]
+let ``blank line before section comment resets alignment group`` () =
+    formatSourceString
+        """
+type Foo = {
+    Id : int
+    Ok : bool
+
+    // Header event information
+    SomeVeryLongField : string
+    X : int
+}
+"""
+        { config with
+            RecordFieldAlignment = true
+            MultilineBracketStyle = Stroustrup }
+    |> prepend newline
+    |> should
+        equal
+        """
+type Foo = {
+    Id : int
+    Ok : bool
+
+    // Header event information
+    SomeVeryLongField : string
+    X                 : int
+}
+"""
+
+[<Test>]
 let ``single-field group is not padded`` () =
     // `MaxRecordWidth = 0` forces multi-line layout even for a one-field
     // record; verifies the alignment path gracefully emits no padding
