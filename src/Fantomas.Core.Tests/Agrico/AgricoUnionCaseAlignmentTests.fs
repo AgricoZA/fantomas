@@ -311,6 +311,36 @@ type Foo =
 """
 
 [<Test>]
+let ``anonymous record payload uses valid multiline layout`` () =
+    formatSourceString
+        """
+module Repro
+
+type Shape =
+    | WithOptions of {| firstValue : Option<int>; secondValue : Option<string> |}
+    | SingleValue of {| name : Option<string> |}
+"""
+        { config with
+            UnionCaseAlignment = true
+            RecordFieldAlignment = true
+            MultilineBracketStyle = Stroustrup
+            MaxLineLength = 100 }
+    |> prepend newline
+    |> should
+        equal
+        """
+module Repro
+
+type Shape =
+    | WithOptions of
+        {|
+            firstValue: Option<int>
+            secondValue: Option<string>
+        |}
+    | SingleValue of {| name: Option<string> |}
+"""
+
+[<Test>]
 let ``no-op when feature is off`` () =
     // Sanity check: the same input that the first test aligns is left
     // untouched when UnionCaseAlignment is false (Fantomas's existing
