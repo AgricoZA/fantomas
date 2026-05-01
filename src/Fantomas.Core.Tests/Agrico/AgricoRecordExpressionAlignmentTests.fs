@@ -107,6 +107,70 @@ let x = {
 """
 
 [<Test>]
+let ``section comment resets alignment group in record expression`` () =
+    formatSourceString
+        """
+let x = {
+    Name = "Alice"
+    Age = 30
+    // Header event information
+    SomeVeryLongField = true
+    X = 1
+    // Metadata
+    At = now
+    By = agent
+}
+"""
+        { config with
+            RecordFieldAlignment = true
+            MultilineBracketStyle = Stroustrup }
+    |> prepend newline
+    |> should
+        equal
+        """
+let x = {
+    Name = "Alice"
+    Age  = 30
+    // Header event information
+    SomeVeryLongField = true
+    X                 = 1
+    // Metadata
+    At = now
+    By = agent
+}
+"""
+
+[<Test>]
+let ``blank line before section comment resets alignment group in record expression`` () =
+    formatSourceString
+        """
+let x = {
+    Name = "Alice"
+    Age = 30
+
+    // Header event information
+    SomeVeryLongField = true
+    X = 1
+}
+"""
+        { config with
+            RecordFieldAlignment = true
+            MultilineBracketStyle = Stroustrup }
+    |> prepend newline
+    |> should
+        equal
+        """
+let x = {
+    Name = "Alice"
+    Age  = 30
+
+    // Header event information
+    SomeVeryLongField = true
+    X                 = 1
+}
+"""
+
+[<Test>]
 let ``single-field record expression is not padded`` () =
     formatSourceString
         """

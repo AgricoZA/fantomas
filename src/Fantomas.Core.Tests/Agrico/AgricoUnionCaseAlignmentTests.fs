@@ -96,6 +96,64 @@ type Foo =
 """
 
 [<Test>]
+let ``section comment resets alignment group`` () =
+    formatSourceString
+        """
+type Foo =
+    | A of int
+    | Bb of string
+    // Header event information
+    | LongCaseName of bool
+    | C of obj
+    // Metadata
+    | At of System.DateTimeOffset
+    | By of string
+"""
+        { config with
+            UnionCaseAlignment = true }
+    |> prepend newline
+    |> should
+        equal
+        """
+type Foo =
+    | A  of int
+    | Bb of string
+    // Header event information
+    | LongCaseName of bool
+    | C            of obj
+    // Metadata
+    | At of System.DateTimeOffset
+    | By of string
+"""
+
+[<Test>]
+let ``blank line before section comment resets alignment group`` () =
+    formatSourceString
+        """
+type Foo =
+    | A of int
+    | Bb of string
+
+    // Header event information
+    | LongCaseName of bool
+    | C of obj
+"""
+        { config with
+            UnionCaseAlignment = true }
+    |> prepend newline
+    |> should
+        equal
+        """
+type Foo =
+    | A  of int
+    | Bb of string
+
+    // Header event information
+    | LongCaseName of bool
+    | C            of obj
+"""
+
+[<Test>]
 let ``cases without of do not participate in alignment`` () =
     // `NoPayload` has no `of`; it neither receives padding nor extends the
     // alignment column. The other cases align as if it weren't there.

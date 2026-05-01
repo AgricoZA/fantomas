@@ -91,10 +91,15 @@ type WriteRecord = {
    - The section comment should print immediately above the first field/case in the new group.
    - The alignment width for the previous group must not include fields/cases after the section comment.
 
-6. Add or update changelog if appropriate.
-   - If the fix changes user-visible fork behaviour, add a `Fixed` entry to `CHANGELOG.md` in the current Agrico section, following the repository instruction to append entries to the end of the relevant section.
+6. Add a new Agrico package version.
+   - Add a new top-level `CHANGELOG.md` release section for this fix, so package generation produces a new version for publishing to the Agrico feed.
+   - Use `8.0.0-alpha-012-agrico-006` unless a newer Agrico version already exists by the time this is merged.
 
-7. Verify.
+7. Prepare for publishing to the Agrico feed.
+   - Run `dotnet pack -c Release --tl` and confirm the generated `Fantomas.FCS`, `Fantomas.Core`, and `fantomas` packages use the new Agrico version.
+   - Do not publish packages until the branch has been reviewed/merged and the user explicitly confirms the publish step.
+
+8. Verify.
    - Run the focused Agrico alignment tests first:
      - `dotnet test src/Fantomas.Core.Tests/ --filter AgricoRecordFieldAlignmentTests`
      - `dotnet test src/Fantomas.Core.Tests/ --filter AgricoRecordExpressionAlignmentTests`
@@ -110,7 +115,7 @@ type WriteRecord = {
 
 - No changes to `fsprojects/fantomas` upstream.
 - No comments or issue updates in the upstream repository.
-- No package publishing as part of this issue.
+- No package publishing before explicit user approval.
 - No whole-codebase reformat beyond files touched by the fix/tests.
 
 ## Final verification reminder

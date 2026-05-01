@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.0.0-alpha-012-agrico-006] - 2026-05-01
+
+### Fixed
+
+- Agrico alignment grouping now treats leading section comments as group boundaries for record fields, record expressions, and discriminated union cases, so commented sections no longer widen each other's alignment columns. See AgricoZA/Ops#2413.
+
 ## [8.0.0-alpha-012-agrico-005] - 2026-04-26
 
 ### Added
