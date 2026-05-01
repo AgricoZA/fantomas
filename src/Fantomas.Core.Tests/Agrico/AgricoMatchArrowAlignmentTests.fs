@@ -174,6 +174,107 @@ let f x =
 """
 
 [<Test>]
+let ``wrapped aligned function argument uses valid multiline arm`` () =
+    formatSourceString
+        """
+module Repro
+
+let test result =
+    task {
+        match result with
+        | Ok value -> Formatter.writeValue $"/long/xxx/242040bc?value={value.ToString()}"
+        | Error(errorTitle, errorMessage) -> state.Set(errorTitle, errorMessage)
+    }
+"""
+        { config with
+            MatchArrowAlignment = true
+            RecordFieldAlignment = true
+            UnionCaseAlignment = true
+            MultilineBracketStyle = Stroustrup
+            MaxLineLength = 100 }
+    |> prepend newline
+    |> should
+        equal
+        """
+module Repro
+
+let test result =
+    task {
+        match result with
+        | Ok value ->
+            Formatter.writeValue $"/long/xxx/242040bc?value={value.ToString()}"
+        | Error(errorTitle, errorMessage) -> state.Set(errorTitle, errorMessage)
+    }
+"""
+
+[<Test>]
+let ``wrapped aligned chained member access uses valid multiline arm`` () =
+    formatSourceString
+        """
+module Repro
+
+let test x =
+    match x with
+    | Short value -> veryLongValueNameXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX.Apply()
+    | MuchLongerPattern other -> other
+"""
+        { config with
+            MatchArrowAlignment = true
+            RecordFieldAlignment = true
+            UnionCaseAlignment = true
+            MultilineBracketStyle = Stroustrup
+            MaxLineLength = 100 }
+    |> prepend newline
+    |> should
+        equal
+        """
+module Repro
+
+let test x =
+    match x with
+    | Short value ->
+        veryLongValueNameXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX.Apply()
+    | MuchLongerPattern other -> other
+"""
+
+[<Test>]
+let ``wrapped aligned computation expression return list uses valid multiline arm`` () =
+    formatSourceString
+        """
+module Repro
+
+let test command =
+    task {
+        match command with
+        | CreateValue -> return [ VeryLongResultNameXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX ]
+        | UpdateValue(firstValue, secondValue, thirdValue) -> return [ ResultValue.Created(firstValue, secondValue, thirdValue) ]
+        | HandleVeryLongOtherCaseName -> return! Error OtherFailure
+    }
+"""
+        { config with
+            MatchArrowAlignment = true
+            RecordFieldAlignment = true
+            UnionCaseAlignment = true
+            MultilineBracketStyle = Stroustrup
+            MaxLineLength = 100 }
+    |> prepend newline
+    |> should
+        equal
+        """
+module Repro
+
+let test command =
+    task {
+        match command with
+        | CreateValue ->
+            return [ VeryLongResultNameXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX ]
+        | UpdateValue(firstValue, secondValue, thirdValue) ->
+            return [ ResultValue.Created(firstValue, secondValue, thirdValue) ]
+        | HandleVeryLongOtherCaseName -> return! Error OtherFailure
+    }
+"""
+
+[<Test>]
 let ``no-op when feature is off`` () =
     formatSourceString
         """

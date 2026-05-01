@@ -1,5 +1,12 @@
 # Changelog
 
+## [8.0.0-alpha-012-agrico-007] - 2026-05-01
+
+### Fixed
+
+- Agrico match-arrow alignment now falls back to a valid multiline arm when aligning the arrow would make an inline arm body wrap invalidly.
+- Agrico union-case alignment now avoids the inline-first-field layout for anonymous record payloads, preserving valid anonymous record syntax. See AgricoZA/Ops#2416.
+
 ## [8.0.0-alpha-012-agrico-006] - 2026-05-01
 
 ### Fixed

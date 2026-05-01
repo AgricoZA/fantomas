@@ -4152,23 +4152,34 @@ let private fieldRenderedWidth (field: FieldNode) (ctx: Context) : int =
 // The first field starts at `firstFieldCol` (the current column when this
 // is called); subsequent fields start two columns to the right of `*`,
 // which itself sits at `firstFieldCol`. Each line must fit individually.
+let rec private typeContainsAnonRecord (t: Type) : bool =
+    match t with
+    | Type.AnonRecord _ -> true
+    | Type.Paren node -> typeContainsAnonRecord node.Type
+    | _ -> false
+
+let private fieldContainsAnonRecord (field: FieldNode) : bool = typeContainsAnonRecord field.Type
+
 let private inlineFirstFieldFits (fields: FieldNode list) (ctx: Context) : bool =
-    match fields with
-    | [] -> true
-    | [ _ ] -> true
-    | firstField :: restFields ->
-        let maxLine = ctx.Config.MaxLineLength
-        let firstFieldCol = ctx.Column
-        let firstFits = firstFieldCol + fieldRenderedWidth firstField ctx <= maxLine
-        // Continuation lines start with `* ` at firstFieldCol, putting
-        // the field name at firstFieldCol + 2.
-        let contFieldCol = firstFieldCol + 2
+    if List.exists fieldContainsAnonRecord fields then
+        false
+    else
+        match fields with
+        | [] -> true
+        | [ _ ] -> true
+        | firstField :: restFields ->
+            let maxLine = ctx.Config.MaxLineLength
+            let firstFieldCol = ctx.Column
+            let firstFits = firstFieldCol + fieldRenderedWidth firstField ctx <= maxLine
+            // Continuation lines start with `* ` at firstFieldCol, putting
+            // the field name at firstFieldCol + 2.
+            let contFieldCol = firstFieldCol + 2
 
-        let restFits =
-            restFields
-            |> List.forall (fun f -> contFieldCol + fieldRenderedWidth f ctx <= maxLine)
+            let restFits =
+                restFields
+                |> List.forall (fun f -> contFieldCol + fieldRenderedWidth f ctx <= maxLine)
 
-        firstFits && restFits
+            firstFits && restFits
 
 // Layout 2 for multi-field cases: render the first field at the current
 // column (where `of ` left off), then each subsequent field on its own
@@ -4363,6 +4374,35 @@ let private genClauseAlignedInline (widthTarget: int) (node: MatchClauseNode) =
 
     genPaddedClause |> genNode node
 
+let private clauseFitsAlignedInline (widthTarget: int) (node: MatchClauseNode) (ctx: Context) : bool =
+    let dummy =
+        ctx.WithDummy(genClauseAlignedInline widthTarget node, keepPageWidth = true)
+
+    dummy.WriterModel.LineCount = ctx.WriterModel.LineCount
+    && dummy.Column <= ctx.Config.MaxLineLength
+
+let private genClauseNaturalMultiline (node: MatchClauseNode) =
+    let genBar =
+        match node.Bar with
+        | Some barNode -> genSingleTextNodeWithSpaceSuffix sepSpace barNode
+        | None -> sepBar
+
+    let genWhen =
+        optSingle
+            (fun e ->
+                sepSpace
+                +> !-"when"
+                +> sepSpaceOrIndentAndNlnIfExpressionExceedsPageWidth (genExpr e))
+            node.WhenExpr
+
+    (genBar
+     +> genPatInClause node.Pattern
+     +> genWhen
+     +> sepSpace
+     +> genSingleTextNode node.Arrow
+     +> indentSepNlnUnindent (genExpr node.BodyExpr))
+    |> genNode node
+
 let private genMaybeAlignedClauses (cfg: FormatConfig) (clauses: MatchClauseNode list) : Context -> Context =
     fun (ctx: Context) ->
         // Short-circuit when alignment is off, when there's nothing to
@@ -4409,7 +4449,10 @@ let private genMaybeAlignedClauses (cfg: FormatConfig) (clauses: MatchClauseNode
                 runningIdx <- runningIdx + 1
 
                 if fits && prefixWidth < widthTarget then
-                    genClauseAlignedInline widthTarget clause
+                    if clauseFitsAlignedInline widthTarget clause ctx then
+                        genClauseAlignedInline widthTarget clause
+                    else
+                        genClauseNaturalMultiline clause
                 else
                     genClause isLastItem clause
 
