@@ -154,3 +154,50 @@ type Animal =
         * Age: int
         * Address: string
 """
+
+// LOB-366: leading commas in multiline generic type parameter lists.
+// Both Type.AppPrefix (type position) and Expr.TypeApp (expression position)
+// render their type arguments through `colGenericTypeParameters`.
+
+[<Test>]
+let ``leading tuple separator in generic type parameters (type position)`` () =
+    formatSourceString
+        """
+type T = Foo<AAAAAAAA, BBBBBBBB, CCCCCCCC>
+"""
+        { config with
+            LeadingTupleSeparator = true
+            MaxLineLength = 30 }
+    |> prepend newline
+    |> should
+        equal
+        """
+type T =
+    Foo<
+        AAAAAAAA
+        , BBBBBBBB
+        , CCCCCCCC
+     >
+"""
+
+[<Test>]
+let ``leading tuple separator in generic type parameters (expression position)`` () =
+    formatSourceString
+        """
+let x = unbox<AAAAAAAA, BBBBBBBB, CCCCCCCC> y
+"""
+        { config with
+            LeadingTupleSeparator = true
+            MaxLineLength = 30 }
+    |> prepend newline
+    |> should
+        equal
+        """
+let x =
+    unbox<
+        AAAAAAAA
+        , BBBBBBBB
+        , CCCCCCCC
+     >
+        y
+"""

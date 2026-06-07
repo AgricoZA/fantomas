@@ -2346,6 +2346,16 @@ let genKeepIdentMatchClause (startNode: Node) (e: Expr) ctx =
     else
         indentSepNlnUnindent (genExpr e) ctx
 
+// Agrico (LOB-366): separator between generic type parameters in the multiline
+// layout. When LeadingTupleSeparator is enabled the comma leads the line (aligned
+// under the first argument), mirroring tuple/union-field behaviour; otherwise it
+// trails as upstream does. The closing `>` column is unaffected (see genPrefixApp).
+let private agricoGenericTypeParameterSeparator (ctx: Context) : Context =
+    if ctx.Config.LeadingTupleSeparator then
+        (sepNln +> sepComma) ctx
+    else
+        (sepComma +> sepNln) ctx
+
 let colGenericTypeParameters typeParameters =
     let genParameters sep =
         coli sep typeParameters (fun idx t ->
@@ -2356,7 +2366,11 @@ let colGenericTypeParameters typeParameters =
 
             leadingSpace +> genType t)
 
-    let long = indentSepNlnUnindent (genParameters (sepComma +> sepNln)) +> sepNln
+    // Agrico: see agricoGenericTypeParameterSeparator.
+    let long =
+        indentSepNlnUnindent (genParameters agricoGenericTypeParameterSeparator)
+        +> sepNln
+
     let short = genParameters sepComma
 
     // Multiline text type params should be unmodified

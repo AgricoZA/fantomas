@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.0.0-alpha-012-agrico-009] - 2026-06-07
+
+### Added
+
+- `LeadingTupleSeparator` now also applies to multiline **generic type parameter lists**. When enabled, commas in `Foo<A, B, C>` lead each line (aligned under the first argument) rather than trailing, matching the existing tuple, pattern, and union-case-field behaviour. Both type-position (`Type.AppPrefix`) and expression-position (`Expr.TypeApp`) applications route through the same `colGenericTypeParameters` helper; the closing `>` column is positioned by `genPrefixApp` and is unaffected. See LOB-366.
+
 ## [8.0.0-alpha-012-agrico-008] - 2026-05-01
 
 ### Changed
