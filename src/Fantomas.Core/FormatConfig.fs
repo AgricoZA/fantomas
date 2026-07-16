@@ -256,7 +256,12 @@ type FormatConfig =
       [<Category("Convention")>]
       [<DisplayName("Align '->' across match arms")>]
       [<Description("When true, the '->' arrow is aligned within groups of consecutive match (or function-keyword) arms whose body fits on the same line as the arrow. Arms whose body wraps to a continuation line keep their arrow at the natural position and do not influence the alignment column. Blank lines reset the alignment group.")>]
-      MatchArrowAlignment: bool }
+      MatchArrowAlignment: bool
+
+      [<Category("Convention")>]
+      [<DisplayName("Insert blank lines between multiline array and list items")>]
+      [<Description("When true, a blank line is inserted between two adjacent items of a multiline array or list literal whenever at least one of the two items is itself multiline. Only affects array/list literals that already span multiple lines; short single-line literals are unaffected. Author-written blank lines are preserved (never doubled) and remain capped by KeepMaxNumberOfBlankLines. Does not apply to seq/computation-expression bodies, which are governed by BlankLinesAroundNestedMultilineExpressions.")>]
+      BlankLinesBetweenMultilineArrayAndListItems: bool }
 
     member x.IsStroustrupStyle = x.MultilineBracketStyle = Stroustrup
 
@@ -300,4 +305,5 @@ type FormatConfig =
           LeadingTupleSeparator = false
           RecordFieldAlignment = false
           UnionCaseAlignment = false
-          MatchArrowAlignment = false }
+          MatchArrowAlignment = false
+          BlankLinesBetweenMultilineArrayAndListItems = false }

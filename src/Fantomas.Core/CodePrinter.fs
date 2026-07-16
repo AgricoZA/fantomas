@@ -1886,12 +1886,29 @@ let genArrayOrList (preferMultilineCramped: bool) (node: ExprArrayOrListNode) =
             +> addSpaceIfSpaceAroundDelimiter
             +> genSingleTextNode node.Closing
 
+        // Agrico (LOB-1686): choose the separator between array/list elements.
+        // When BlankLinesBetweenMultilineArrayAndListItems is on, route the
+        // elements through the existing colWithNlnWhenItemIsMultiline primitive
+        // so a blank line falls between two items whenever at least one is
+        // multiline; otherwise keep the upstream single-newline separator
+        // (`fallbackSep`). Only this helper and the two call sites below are
+        // fork code — the rest of genArrayOrList is upstream.
+        let genElements fallbackSep : Context -> Context =
+            fun ctx ->
+                if ctx.Config.BlankLinesBetweenMultilineArrayAndListItems then
+                    (node.Elements
+                     |> List.map (fun e -> ColMultilineItem(genExpr e, sepNlnUnlessContentBefore (Expr.Node e)))
+                     |> colWithNlnWhenItemIsMultiline)
+                        ctx
+                else
+                    col fallbackSep node.Elements genExpr ctx
+
         let multilineExpression =
             let genMultiLineArrayOrListAlignBrackets =
                 genSingleTextNode node.Opening
                 +> indent
                 +> sepNlnUnlessLastEventIsNewline
-                +> col sepNln node.Elements genExpr
+                +> genElements sepNln
                 +> unindentWithTriviaAwareness
                 +> sepNlnUnlessLastEventIsNewline
                 +> genSingleTextNode node.Closing
@@ -1900,7 +1917,7 @@ let genArrayOrList (preferMultilineCramped: bool) (node: ExprArrayOrListNode) =
                 genSingleTextNodeSuffixDelimiter node.Opening
                 +> atCurrentColumnIndent (
                     sepNlnWhenWriteBeforeNewlineNotEmpty
-                    +> col sepNlnUnlessLastEventIsNewline node.Elements genExpr
+                    +> genElements sepNlnUnlessLastEventIsNewline
                     +> (enterNode node.Closing
                         +> (fun ctx ->
                             let isFixed = lastWriteEventIsNewline ctx

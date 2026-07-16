@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.0.0-alpha-012-agrico-010] - 2026-07-16
+
+### Added
+
+- New opt-in option `BlankLinesBetweenMultilineArrayAndListItems` (`fsharp_blank_lines_between_multiline_array_and_list_items`, default `false`). When enabled, a blank line is inserted between two adjacent items of a multiline array or list literal whenever at least one of the two items is itself multiline, reusing the existing `colWithNlnWhenItemIsMultiline` primitive. Short single-line literals are never forced multiline, author-written blank lines are preserved (not doubled) and remain capped by `KeepMaxNumberOfBlankLines`, and the default-off path is byte-for-byte unchanged. Applies to both the aligned and cramped bracket styles; `seq`/computation-expression bodies are unaffected (they are governed by `BlankLinesAroundNestedMultilineExpressions`). Addresses the gap tracked upstream in fsprojects/fantomas#2856. See LOB-1686.
+
 ## [8.0.0-alpha-012-agrico-009] - 2026-06-07
 
 ### Added
